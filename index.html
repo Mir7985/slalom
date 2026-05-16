@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Slalom Penalizace</title>
+
+    <!-- Meta tagy pro webové aplikace na iOS (Apple) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Slalom App">
+
+    <!-- Zabudovaný Web App Manifest pro Android (přidání na plochu) -->
+    <link rel="manifest" href='data:application/manifest+json;utf8,{"name":"Slalom Penalizace","short_name":"Slalom","start_url":".","display":"standalone","background_color":"#f3f4f6","theme_color":"#2563eb"}'>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; }
+        .btn { transition: all 0.2s; }
+        .btn:active { transform: scale(0.95); }
+        .penalty-btn.active-5 { background-color: #fbbf24; color: white; border-color: #fbbf24; } /* Žlutá pro +5 */
+        .penalty-btn.active-50 { background-color: #ef4444; color: white; border-color: #ef4444; } /* Červená pro +50 */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="p-4 sm:p-6 text-gray-800">
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-6">
+        <h1 class="text-2xl font-bold text-center mb-6 text-blue-600">Sběr Penalizací</h1>
+
+        <div id="setup-section" class="space-y-4">
+            <!-- Výběr kola -->
+            <div>
+                <label class="block text-sm font-semibold mb-1">Kolo závodu:</label>
+                <div class="flex gap-2">
+                    <button type="button" class="btn flex-1 py-2 border-2 border-blue-500 rounded-lg text-blue-600 font-bold hover:bg-blue-50 focus:outline-none" id="btn-kolo-1" onclick="selectKolo(1)">1. Kolo</button>
+                    <button type="button" class="btn flex-1 py-2 border-2 border-blue-500 rounded-lg text-blue-600 font-bold hover:bg-blue-50 focus:outline-none" id="btn-kolo-2" onclick="selectKolo(2)">2. Kolo</button>
+                </div>
+            </div>
+
+            <!-- Výběr stanoviště -->
+            <div>
+                <label class="block text-sm font-semibold mb-1">Stanoviště (1-6):</label>
+                <select id="station-select" class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-lg">
+                    <option value="" disabled selected>Vyberte stanoviště...</option>
+                    <option value="1">Stanoviště 1</option>
+                    <option value="2">Stanoviště 2</option>
+                    <option value="3">Stanoviště 3</option>
+                    <option value="4">Stanoviště 4</option>
+                    <option value="5">Stanoviště 5</option>
+                    <option value="6">Stanoviště 6</option>
+                </select>
+            </div>
+
+            <!-- Nastavení branek pro stanoviště -->
+            <div class="flex gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold mb-1">Od branky č.:</label>
+                    <input type="number" id="gate-start" class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-lg text-center" min="1" max="18" value="1" onchange="checkSetupReady()">
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold mb-1">Do branky č.:</label>
+                    <input type="number" id="gate-end" class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-lg text-center" min="1" max="18" value="3" onchange="checkSetupReady()">
+                </div>
+            </div>
+
+            <!-- Tlačítko pro zahájení -->
+            <button class="btn w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg mt-4 disabled:opacity-50" id="start-btn" onclick="initStation()" disabled>Pokračovat k zadávání</button>
+        </div>
+
+        <div id="penalty-section" class="hidden space-y-6">
+            <div class="flex justify-between items-center bg-blue-50 p-3 rounded-lg border border-blue-100">
+                <div>
+                    <span class="text-sm text-gray-500">Stanoviště:</span>
+                    <strong id="display-station" class="text-lg text-blue-700 ml-1"></strong>
+                </div>
+                <div>
+                    <span class="text-sm text-gray-500">Kolo:</span>
+                    <strong id="display-kolo" class="text-lg text-blue-700 ml-1"></strong>
+                </div>
+                <button onclick="resetSetup()" class="text-sm text-red-500 underline">Změnit</button>
+            </div>
+
+            <!-- Startovní číslo -->
+            <div>
+                <label for="bib-number" class="block text-sm font-semibold mb-1 text-center">Startovní číslo:</label>
+                <input type="number" id="bib-number" class="w-full text-center text-4xl p-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none font-bold" placeholder="000" inputmode="numeric">
+            </div>
+
+            <!-- Dynamicky generované branky -->
+            <div id="gates-container" class="space-y-3">
+                <!-- Zde se vygenerují branky pomocí JS -->
+                <p class="text-center text-gray-500 text-sm">Načítám branky...</p>
+            </div>
+
+            <!-- Odeslat -->
+            <button id="submit-btn" class="btn w-full flex items-center justify-center gap-2 py-4 bg-green-600 hover:bg-green-700 text-white text-xl font-bold rounded-xl shadow-md" onclick="submitData()">
+                <span id="submit-text">Odeslat data</span>
+                <div id="submit-spinner" class="spinner hidden"></div>
+            </button>
+            
+            <div id="status-message" class="text-center text-sm font-semibold hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        // Konfigurace URL pro Google Apps Script (Nutno nahradit!)
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8U7mfFfYv3S4cgymxgBb4YzQNaG9uI_g5NNiORRNJABMh4TBRHdV0-rWWPr8UWC1V1Q/exec'; 
+        
+        let currentKolo = null;
+        let currentStation = null;
+        let currentGateStart = null;
+        let currentGateEnd = null;
+        
+        let currentPenalties = {}; // Ukládá stav pro každou branku: { "1": 0, "2": 5, "3": 50 }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const stationSelect = document.getElementById('station-select');
+            
+            stationSelect.addEventListener('change', checkSetupReady);
+        });
+
+        function selectKolo(kolo) {
+            currentKolo = kolo;
+            document.getElementById('btn-kolo-1').classList.remove('bg-blue-600', 'text-white');
+            document.getElementById('btn-kolo-2').classList.remove('bg-blue-600', 'text-white');
+            
+            document.getElementById(`btn-kolo-${kolo}`).classList.add('bg-blue-600', 'text-white');
+            checkSetupReady();
+        }
+
+        function checkSetupReady() {
+            const station = document.getElementById('station-select').value;
+            const startBtn = document.getElementById('start-btn');
+            const gateStart = parseInt(document.getElementById('gate-start').value);
+            const gateEnd = parseInt(document.getElementById('gate-end').value);
+            
+            // Kontrola: Kolo vybráno, stanoviště vybráno, a branky dávají smysl (např. 1 až 4)
+            if (currentKolo && station && gateStart >= 1 && gateEnd >= gateStart && gateEnd <= 18) {
+                startBtn.disabled = false;
+            } else {
+                startBtn.disabled = true;
+            }
+        }
+
+        function initStation() {
+            currentStation = parseInt(document.getElementById('station-select').value);
+            currentGateStart = parseInt(document.getElementById('gate-start').value);
+            currentGateEnd = parseInt(document.getElementById('gate-end').value);
+            
+            document.getElementById('setup-section').classList.add('hidden');
+            document.getElementById('penalty-section').classList.remove('hidden');
+            
+            document.getElementById('display-station').textContent = currentStation;
+            document.getElementById('display-kolo').textContent = currentKolo;
+            
+            renderGates();
+        }
+
+        function resetSetup() {
+            document.getElementById('setup-section').classList.remove('hidden');
+            document.getElementById('penalty-section').classList.add('hidden');
+            
+            // Vyčištění formuláře
+            document.getElementById('bib-number').value = '';
+            currentPenalties = {};
+            hideStatus();
+        }
+
+        function renderGates() {
+            const container = document.getElementById('gates-container');
+            container.innerHTML = '';
+            
+            currentPenalties = {}; // Reset penalizací
+            
+            if (currentGateStart === null || currentGateEnd === null || currentGateStart > currentGateEnd) {
+                container.innerHTML = '<p class="text-center text-red-500">Chybně zadaný rozsah branek.</p>';
+                return;
+            }
+
+            for (let gateNum = currentGateStart; gateNum <= currentGateEnd; gateNum++) {
+                currentPenalties[gateNum] = 0; // Výchozí stav 0
+                
+                const gateHTML = `
+                    <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                        <div class="text-xl font-bold w-12 text-center text-gray-700">${gateNum}</div>
+                        <div class="flex gap-2 flex-1 justify-end">
+                            <button class="penalty-btn btn flex-1 py-2 border-2 border-gray-300 rounded text-gray-600 font-semibold focus:outline-none" 
+                                    id="btn-gate-${gateNum}-0" 
+                                    onclick="setPenalty(${gateNum}, 0)"
+                                    style="background-color: #e5e7eb;">0</button>
+                            <button class="penalty-btn btn flex-1 py-2 border-2 border-yellow-400 rounded text-yellow-600 font-semibold focus:outline-none" 
+                                    id="btn-gate-${gateNum}-5" 
+                                    onclick="setPenalty(${gateNum}, 5)">5</button>
+                            <button class="penalty-btn btn flex-1 py-2 border-2 border-red-500 rounded text-red-500 font-semibold focus:outline-none" 
+                                    id="btn-gate-${gateNum}-50" 
+                                    onclick="setPenalty(${gateNum}, 50)">50</button>
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', gateHTML);
+                
+                // Zvýraznění výchozí '0'
+                setPenalty(gateNum, 0);
+            }
+        }
+
+        function setPenalty(gateNum, value) {
+            currentPenalties[gateNum] = value;
+            
+            // Reset stylů tlačítek pro danou branku
+            document.getElementById(`btn-gate-${gateNum}-0`).classList.remove('bg-gray-200', 'text-gray-800');
+            document.getElementById(`btn-gate-${gateNum}-0`).style.backgroundColor = 'transparent';
+            
+            document.getElementById(`btn-gate-${gateNum}-5`).classList.remove('active-5');
+            document.getElementById(`btn-gate-${gateNum}-50`).classList.remove('active-50');
+            
+            // Aplikace stylu na vybrané
+            if (value === 0) {
+                document.getElementById(`btn-gate-${gateNum}-0`).style.backgroundColor = '#e5e7eb'; // bg-gray-200
+            } else if (value === 5) {
+                document.getElementById(`btn-gate-${gateNum}-5`).classList.add('active-5');
+            } else if (value === 50) {
+                document.getElementById(`btn-gate-${gateNum}-50`).classList.add('active-50');
+            }
+        }
+
+        async function submitData() {
+            const bibNumber = document.getElementById('bib-number').value.trim();
+            
+            if (!bibNumber) {
+                showStatus('Zadejte startovní číslo!', 'error');
+                return;
+            }
+
+            // Příprava dat
+            const dataPayload = {
+                action: 'savePenalty',
+                kolo: currentKolo,
+                stanoviste: currentStation,
+                startovniCislo: parseInt(bibNumber),
+                penalizace: currentPenalties // objekt např. { "1": 0, "2": 2 }
+            };
+
+            setLoadingState(true);
+            
+            try {
+                // Pozor: Zde se využívá 'no-cors' nebo se spoléhá na to, že Apps Script 
+                // je nastaven jako Web App přístupný pro všechny s parametrem POST.
+                // Pro jednodušší implementaci se často používá GET request s parametry, 
+                // ale pro komplexnější data je POST lepší.
+                
+                // Pokud GOOGLE_SCRIPT_URL není nastaveno, simulujeme úspěch
+                if(GOOGLE_SCRIPT_URL === 'VLOZTE_URL_VASEHO_APPS_SCRIPTU') {
+                    console.log('Simulace odeslání (URL nezadána):', dataPayload);
+                    setTimeout(() => {
+                        handleSuccess();
+                    }, 1000);
+                    return;
+                }
+
+                // Skutečné odeslání (Vyžaduje správně nastavený Apps Script)
+                // Používáme běžný fetch. Ujistěte se, že Apps Script má povolené CORS 
+                // (vrací správné hlavičky v doGet/doPost) nebo použijte metodu přes skrytý iframe.
+                
+                // Zde je příklad volání pomocí POST, který Apps Script zpracuje v doPost(e)
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors', // Obejití CORS na klientovi (neuvidíme odpověď, ale odešle se)
+                    headers: {
+                        'Content-Type': 'text/plain', // Apps script lépe zpracovává plain text u no-cors
+                    },
+                    body: JSON.stringify(dataPayload)
+                });
+                
+                // Jelikož používáme no-cors, response.ok je vždy false (opaque response)
+                // Předpokládáme úspěch, pokud nespadneme do catch bloku
+                handleSuccess();
+
+            } catch (error) {
+                console.error('Chyba při odesílání:', error);
+                showStatus('Chyba připojení. Zkuste to znovu.', 'error');
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        function handleSuccess() {
+            showStatus(`Data pro číslo ${document.getElementById('bib-number').value} uložena!`, 'success');
+            
+            // Rychlý reset pro dalšího závodníka
+            document.getElementById('bib-number').value = '';
+            renderGates(); // Znovu vykreslí a resetuje na nuly
+            document.getElementById('bib-number').focus();
+            
+            // Schovat zprávu po chvíli
+            setTimeout(hideStatus, 3000);
+        }
+
+        function setLoadingState(isLoading) {
+            const btn = document.getElementById('submit-btn');
+            const text = document.getElementById('submit-text');
+            const spinner = document.getElementById('submit-spinner');
+            
+            if (isLoading) {
+                btn.disabled = true;
+                btn.classList.add('opacity-75', 'cursor-not-allowed');
+                text.textContent = 'Odesílám...';
+                spinner.classList.remove('hidden');
+            } else {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                text.textContent = 'Odeslat data';
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.classList.remove('hidden', 'text-green-600', 'text-red-600');
+            
+            if (type === 'success') {
+                statusEl.classList.add('text-green-600');
+            } else {
+                statusEl.classList.add('text-red-600');
+            }
+        }
+
+        function hideStatus() {
+            document.getElementById('status-message').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
