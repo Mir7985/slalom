@@ -237,7 +237,7 @@
 
             setLoadingState(true);
             try {
-                if(GOOGLE_SCRIPT_URL === '') {
+                if(GOOGLE_SCRIPT_URL === 'VLOZTE_URL_VASEHO_APPS_SCRIPTU') {
                     setTimeout(() => { handleSuccess(); }, 1000); return;
                 }
                 const response = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(dataPayload) });
