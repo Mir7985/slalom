@@ -8,10 +8,14 @@
     <!-- Meta tagy pro webové aplikace na iOS (Apple) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Slalom App">
+    <meta name="apple-mobile-web-app-title" content="Slalom">
 
-    <!-- Zabudovaný Web App Manifest pro Android (přidání na plochu) -->
-    <link rel="manifest" href='data:application/manifest+json;utf8,{"name":"Slalom Penalizace","short_name":"Slalom","start_url":".","display":"standalone","background_color":"#f3f4f6","theme_color":"#2563eb"}'>
+    <!-- Meta tagy pro Android (schování adresního řádku) -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2563eb">
+
+    <!-- Zabudovaný Web App Manifest (Nyní obsahuje i ikonku, kterou Android vyžaduje) -->
+    <link rel="manifest" href='data:application/manifest+json;utf8,{"name":"Slalom Penalizace","short_name":"Slalom","start_url":".","display":"standalone","background_color":"#f3f4f6","theme_color":"#2563eb","icons":[{"src":"https://placehold.co/512x512/2563eb/ffffff.png?text=S","sizes":"512x512","type":"image/png"}]}'>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -112,7 +116,7 @@
     </div>
 
     <script>
-        // Konfigurace URL pro Google Apps Script (Nutno nahradit!)
+        // Nezapomeňte si sem vložit zpět vaši URL adresu z Google Apps Scriptu!
         const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx8U7mfFfYv3S4cgymxgBb4YzQNaG9uI_g5NNiORRNJABMh4TBRHdV0-rWWPr8UWC1V1Q/exec'; 
         
         let currentKolo = null;
@@ -120,11 +124,10 @@
         let currentGateStart = null;
         let currentGateEnd = null;
         
-        let currentPenalties = {}; // Ukládá stav pro každou branku: { "1": 0, "2": 5, "3": 50 }
+        let currentPenalties = {};
 
         document.addEventListener('DOMContentLoaded', () => {
             const stationSelect = document.getElementById('station-select');
-            
             stationSelect.addEventListener('change', checkSetupReady);
         });
 
@@ -143,7 +146,6 @@
             const gateStart = parseInt(document.getElementById('gate-start').value);
             const gateEnd = parseInt(document.getElementById('gate-end').value);
             
-            // Kontrola: Kolo vybráno, stanoviště vybráno, a branky dávají smysl (např. 1 až 4)
             if (currentKolo && station && gateStart >= 1 && gateEnd >= gateStart && gateEnd <= 18) {
                 startBtn.disabled = false;
             } else {
@@ -169,7 +171,6 @@
             document.getElementById('setup-section').classList.remove('hidden');
             document.getElementById('penalty-section').classList.add('hidden');
             
-            // Vyčištění formuláře
             document.getElementById('bib-number').value = '';
             currentPenalties = {};
             hideStatus();
@@ -179,7 +180,7 @@
             const container = document.getElementById('gates-container');
             container.innerHTML = '';
             
-            currentPenalties = {}; // Reset penalizací
+            currentPenalties = {}; 
             
             if (currentGateStart === null || currentGateEnd === null || currentGateStart > currentGateEnd) {
                 container.innerHTML = '<p class="text-center text-red-500">Chybně zadaný rozsah branek.</p>';
@@ -187,7 +188,7 @@
             }
 
             for (let gateNum = currentGateStart; gateNum <= currentGateEnd; gateNum++) {
-                currentPenalties[gateNum] = 0; // Výchozí stav 0
+                currentPenalties[gateNum] = 0; 
                 
                 const gateHTML = `
                     <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
@@ -207,8 +208,6 @@
                     </div>
                 `;
                 container.insertAdjacentHTML('beforeend', gateHTML);
-                
-                // Zvýraznění výchozí '0'
                 setPenalty(gateNum, 0);
             }
         }
@@ -216,16 +215,14 @@
         function setPenalty(gateNum, value) {
             currentPenalties[gateNum] = value;
             
-            // Reset stylů tlačítek pro danou branku
             document.getElementById(`btn-gate-${gateNum}-0`).classList.remove('bg-gray-200', 'text-gray-800');
             document.getElementById(`btn-gate-${gateNum}-0`).style.backgroundColor = 'transparent';
             
             document.getElementById(`btn-gate-${gateNum}-5`).classList.remove('active-5');
             document.getElementById(`btn-gate-${gateNum}-50`).classList.remove('active-50');
             
-            // Aplikace stylu na vybrané
             if (value === 0) {
-                document.getElementById(`btn-gate-${gateNum}-0`).style.backgroundColor = '#e5e7eb'; // bg-gray-200
+                document.getElementById(`btn-gate-${gateNum}-0`).style.backgroundColor = '#e5e7eb'; 
             } else if (value === 5) {
                 document.getElementById(`btn-gate-${gateNum}-5`).classList.add('active-5');
             } else if (value === 50) {
@@ -241,50 +238,31 @@
                 return;
             }
 
-            // Příprava dat
             const dataPayload = {
                 action: 'savePenalty',
                 kolo: currentKolo,
                 stanoviste: currentStation,
                 startovniCislo: parseInt(bibNumber),
-                penalizace: currentPenalties // objekt např. { "1": 0, "2": 2 }
+                penalizace: currentPenalties
             };
 
             setLoadingState(true);
             
             try {
-                // Pozor: Zde se využívá 'no-cors' nebo se spoléhá na to, že Apps Script 
-                // je nastaven jako Web App přístupný pro všechny s parametrem POST.
-                // Pro jednodušší implementaci se často používá GET request s parametry, 
-                // ale pro komplexnější data je POST lepší.
-                
-                // Pokud GOOGLE_SCRIPT_URL není nastaveno, simulujeme úspěch
                 if(GOOGLE_SCRIPT_URL === 'VLOZTE_URL_VASEHO_APPS_SCRIPTU') {
                     console.log('Simulace odeslání (URL nezadána):', dataPayload);
-                    setTimeout(() => {
-                        handleSuccess();
-                    }, 1000);
+                    setTimeout(() => { handleSuccess(); }, 1000);
                     return;
                 }
 
-                // Skutečné odeslání (Vyžaduje správně nastavený Apps Script)
-                // Používáme běžný fetch. Ujistěte se, že Apps Script má povolené CORS 
-                // (vrací správné hlavičky v doGet/doPost) nebo použijte metodu přes skrytý iframe.
-                
-                // Zde je příklad volání pomocí POST, který Apps Script zpracuje v doPost(e)
                 const response = await fetch(GOOGLE_SCRIPT_URL, {
                     method: 'POST',
-                    mode: 'no-cors', // Obejití CORS na klientovi (neuvidíme odpověď, ale odešle se)
-                    headers: {
-                        'Content-Type': 'text/plain', // Apps script lépe zpracovává plain text u no-cors
-                    },
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify(dataPayload)
                 });
                 
-                // Jelikož používáme no-cors, response.ok je vždy false (opaque response)
-                // Předpokládáme úspěch, pokud nespadneme do catch bloku
                 handleSuccess();
-
             } catch (error) {
                 console.error('Chyba při odesílání:', error);
                 showStatus('Chyba připojení. Zkuste to znovu.', 'error');
@@ -295,13 +273,9 @@
 
         function handleSuccess() {
             showStatus(`Data pro číslo ${document.getElementById('bib-number').value} uložena!`, 'success');
-            
-            // Rychlý reset pro dalšího závodníka
             document.getElementById('bib-number').value = '';
-            renderGates(); // Znovu vykreslí a resetuje na nuly
+            renderGates(); 
             document.getElementById('bib-number').focus();
-            
-            // Schovat zprávu po chvíli
             setTimeout(hideStatus, 3000);
         }
 
@@ -327,17 +301,11 @@
             const statusEl = document.getElementById('status-message');
             statusEl.textContent = message;
             statusEl.classList.remove('hidden', 'text-green-600', 'text-red-600');
-            
-            if (type === 'success') {
-                statusEl.classList.add('text-green-600');
-            } else {
-                statusEl.classList.add('text-red-600');
-            }
+            if (type === 'success') { statusEl.classList.add('text-green-600'); } 
+            else { statusEl.classList.add('text-red-600'); }
         }
 
-        function hideStatus() {
-            document.getElementById('status-message').classList.add('hidden');
-        }
+        function hideStatus() { document.getElementById('status-message').classList.add('hidden'); }
     </script>
 </body>
 </html>
