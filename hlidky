@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Slalom Hlídky</title>
+
+    <!-- Meta tagy pro iOS (Apple) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Hlídky">
+
+    <!-- Meta tagy pro starší Android -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#10b981">
+
+    <!-- Dynamické generování Manifestu -->
+    <script>
+        (function() {
+            const currentUrl = window.location.href.split('?')[0].split('#')[0];
+            
+            // Zelená ikonka s písmenem H pro hlídky
+            const iconData = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%2310b981'/%3E%3Ctext x='256' y='360' font-family='Arial' font-size='300' font-weight='bold' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E";
+
+            const manifest = {
+                "name": "Slalom Hlídky",
+                "short_name": "Hlídky",
+                "start_url": currentUrl,
+                "display": "standalone",
+                "background_color": "#f3f4f6",
+                "theme_color": "#10b981",
+                "icons": [
+                    {
+                        "src": iconData,
+                        "sizes": "192x192 512x512",
+                        "type": "image/svg+xml",
+                        "purpose": "any maskable"
+                    }
+                ]
+            };
+
+            const manifestString = JSON.stringify(manifest);
+            const encodedManifest = "data:application/manifest+json;base64," + btoa(unescape(encodeURIComponent(manifestString)));
+            
+            const link = document.createElement('link');
+            link.rel = 'manifest';
+            link.href = encodedManifest;
+            document.head.appendChild(link);
+        })();
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; overscroll-behavior-y: contain; }
+        .btn { transition: all 0.2s; }
+        .btn:active { transform: scale(0.95); }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 4px solid white;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* Skrytí šipek v číselném inputu pro čistší vzhled */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; margin: 0; 
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-6 text-gray-800">
+    <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-6 border-t-8 border-emerald-500">
+        <h1 class="text-2xl font-bold text-center mb-6 text-emerald-600">Hlídky - Penalizace</h1>
+
+        <div id="setup-section" class="space-y-4">
+            
+            <!-- Výběr stanoviště -->
+            <div>
+                <label class="block text-sm font-semibold mb-1">Stanoviště (1-6):</label>
+                <select id="station-select" class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-lg">
+                    <option value="" disabled selected>Vyberte stanoviště...</option>
+                    <option value="1">Stanoviště 1</option>
+                    <option value="2">Stanoviště 2</option>
+                    <option value="3">Stanoviště 3</option>
+                    <option value="4">Stanoviště 4</option>
+                    <option value="5">Stanoviště 5</option>
+                    <option value="6">Stanoviště 6</option>
+                </select>
+            </div>
+
+            <!-- Nastavení branek pro stanoviště -->
+            <div class="flex gap-4">
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold mb-1">Od branky č.:</label>
+                    <input type="number" id="gate-start" class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-lg text-center" min="1" max="18" value="1" onchange="checkSetupReady()">
+                </div>
+                <div class="flex-1">
+                    <label class="block text-sm font-semibold mb-1">Do branky č.:</label>
+                    <input type="number" id="gate-end" class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-lg text-center" min="1" max="18" value="3" onchange="checkSetupReady()">
+                </div>
+            </div>
+
+            <!-- Tlačítko pro zahájení -->
+            <button class="btn w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg mt-4 disabled:opacity-50" id="start-btn" onclick="initStation()" disabled>Pokračovat k zadávání</button>
+        </div>
+
+        <div id="penalty-section" class="hidden space-y-6">
+            <div class="flex justify-between items-center bg-emerald-50 p-3 rounded-lg border border-emerald-100">
+                <div>
+                    <span class="text-sm text-gray-500">Stanoviště:</span>
+                    <strong id="display-station" class="text-lg text-emerald-700 ml-1"></strong>
+                </div>
+                <div>
+                    <span class="text-sm text-gray-500">Závod:</span>
+                    <strong class="text-lg text-emerald-700 ml-1">Hlídky</strong>
+                </div>
+                <button onclick="resetSetup()" class="text-sm text-red-500 underline">Změnit</button>
+            </div>
+
+            <!-- Startovní číslo -->
+            <div>
+                <label for="bib-number" class="block text-sm font-semibold mb-1 text-center">Startovní číslo hlídky:</label>
+                <input type="number" id="bib-number" class="w-full text-center text-4xl p-3 border-2 border-gray-300 rounded-xl focus:border-emerald-500 focus:outline-none font-bold" placeholder="000" inputmode="numeric">
+            </div>
+
+            <!-- Dynamicky generované branky -->
+            <div id="gates-container" class="space-y-3">
+                <p class="text-center text-gray-500 text-sm">Načítám branky...</p>
+            </div>
+
+            <!-- Odeslat -->
+            <button id="submit-btn" class="btn w-full flex items-center justify-center gap-2 py-4 bg-gray-800 hover:bg-black text-white text-xl font-bold rounded-xl shadow-md" onclick="submitData()">
+                <span id="submit-text">Odeslat data</span>
+                <div id="submit-spinner" class="spinner hidden"></div>
+            </button>
+            
+            <div id="status-message" class="text-center text-sm font-semibold hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- ZDE VLOŽTE SVOJI STEJNOU ADRESU Z GOOGLE APPS SCRIPTU JAKO MINULE ---
+        const GOOGLE_SCRIPT_URL = 'VLOZTE_URL_VASEHO_APPS_SCRIPTU'; 
+        
+        let currentStation = null;
+        let currentGateStart = null;
+        let currentGateEnd = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const stationSelect = document.getElementById('station-select');
+            stationSelect.addEventListener('change', checkSetupReady);
+        });
+
+        function checkSetupReady() {
+            const station = document.getElementById('station-select').value;
+            const startBtn = document.getElementById('start-btn');
+            const gateStart = parseInt(document.getElementById('gate-start').value);
+            const gateEnd = parseInt(document.getElementById('gate-end').value);
+            
+            // Už nevyžadujeme výběr kola, jen stanoviště a branky
+            if (station && gateStart >= 1 && gateEnd >= gateStart && gateEnd <= 18) {
+                startBtn.disabled = false;
+            } else {
+                startBtn.disabled = true;
+            }
+        }
+
+        function initStation() {
+            currentStation = parseInt(document.getElementById('station-select').value);
+            currentGateStart = parseInt(document.getElementById('gate-start').value);
+            currentGateEnd = parseInt(document.getElementById('gate-end').value);
+            
+            document.getElementById('setup-section').classList.add('hidden');
+            document.getElementById('penalty-section').classList.remove('hidden');
+            
+            document.getElementById('display-station').textContent = currentStation;
+            
+            renderGates();
+        }
+
+        function resetSetup() {
+            document.getElementById('setup-section').classList.remove('hidden');
+            document.getElementById('penalty-section').classList.add('hidden');
+            
+            document.getElementById('bib-number').value = '';
+            hideStatus();
+        }
+
+        function renderGates() {
+            const container = document.getElementById('gates-container');
+            container.innerHTML = '';
+            
+            if (currentGateStart === null || currentGateEnd === null || currentGateStart > currentGateEnd) {
+                container.innerHTML = '<p class="text-center text-red-500">Chybně zadaný rozsah branek.</p>';
+                return;
+            }
+
+            for (let gateNum = currentGateStart; gateNum <= currentGateEnd; gateNum++) {
+                const gateHTML = `
+                    <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg shadow-sm">
+                        <div class="text-xl font-bold w-12 text-center text-gray-700">${gateNum}</div>
+                        <div class="flex-1 ml-4 flex items-center gap-3">
+                            <span class="text-sm text-gray-400 font-semibold uppercase tracking-wide">Součet:</span>
+                            <input type="number" id="gate-input-${gateNum}" 
+                                class="w-full text-center text-3xl p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none font-bold text-emerald-700 bg-emerald-50" 
+                                placeholder="0" inputmode="numeric" min="0">
+                        </div>
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', gateHTML);
+            }
+        }
+
+        async function submitData() {
+            const bibNumber = document.getElementById('bib-number').value.trim();
+            if (!bibNumber) { showStatus('Zadejte startovní číslo hlídky!', 'error'); return; }
+
+            // Posbíráme hodnoty ze všech inputů branek
+            let currentPenalties = {};
+            for (let i = currentGateStart; i <= currentGateEnd; i++) {
+                let inputVal = document.getElementById(`gate-input-${i}`).value;
+                // Pokud je pole prázdné, zapíšeme 0, jinak zapíšeme číslo
+                currentPenalties[i] = inputVal === '' ? 0 : parseInt(inputVal);
+            }
+
+            // Kolo posíláme natvrdo jako "Hlídky"
+            const dataPayload = { 
+                action: 'savePenalty', 
+                kolo: 'Hlídky', 
+                stanoviste: currentStation, 
+                startovniCislo: parseInt(bibNumber), 
+                penalizace: currentPenalties 
+            };
+
+            setLoadingState(true);
+            try {
+                if(GOOGLE_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbx8U7mfFfYv3S4cgymxgBb4YzQNaG9uI_g5NNiORRNJABMh4TBRHdV0-rWWPr8UWC1V1Q/exec') {
+                    setTimeout(() => { handleSuccess(); }, 1000); return;
+                }
+                const response = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(dataPayload) });
+                handleSuccess();
+            } catch (error) {
+                showStatus('Chyba připojení. Zkuste to znovu.', 'error');
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        function handleSuccess() {
+            showStatus(`Data pro hlídku ${document.getElementById('bib-number').value} uložena!`, 'success');
+            document.getElementById('bib-number').value = '';
+            
+            // Vymažeme hodnoty ve všech inputech pro branky
+            for (let i = currentGateStart; i <= currentGateEnd; i++) {
+                document.getElementById(`gate-input-${i}`).value = '';
+            }
+            
+            document.getElementById('bib-number').focus();
+            setTimeout(hideStatus, 3000);
+        }
+
+        function setLoadingState(isLoading) {
+            const btn = document.getElementById('submit-btn');
+            const text = document.getElementById('submit-text');
+            const spinner = document.getElementById('submit-spinner');
+            if (isLoading) {
+                btn.disabled = true; btn.classList.add('opacity-75', 'cursor-not-allowed');
+                text.textContent = 'Odesílám...'; spinner.classList.remove('hidden');
+            } else {
+                btn.disabled = false; btn.classList.remove('opacity-75', 'cursor-not-allowed');
+                text.textContent = 'Odeslat data'; spinner.classList.add('hidden');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.classList.remove('hidden', 'text-emerald-600', 'text-red-600');
+            if (type === 'success') { statusEl.classList.add('text-emerald-600'); } else { statusEl.classList.add('text-red-600'); }
+        }
+        function hideStatus() { document.getElementById('status-message').classList.add('hidden'); }
+    </script>
+</body>
+</html>
