@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint - Živé Výsledky</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap');
+        
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        .table-container {
+            width: 100%;
+            flex: 1; /* Pružné natažení na zbytek výšky obrazovky */
+            overflow-y: auto;
+            overflow-x: auto; /* Povolí vodorovné posouvání na mobilu */
+            -webkit-overflow-scrolling: touch; /* Plynulejší posouvání na iOS */
+            font-family: 'Roboto Mono', monospace;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        thead {
+            position: sticky;
+            top: 0;
+            background-color: #1e293b;
+            z-index: 10;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+        }
+
+        th {
+            text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em;
+            color: #94a3b8; padding: 16px; text-align: left; white-space: nowrap;
+        }
+
+        td {
+            padding: 16px; border-bottom: 1px solid #334155; font-size: 1.15rem; 
+        }
+
+        tbody tr:nth-child(even) { background-color: #1e293b; }
+        tbody tr:hover { background-color: #334155; }
+
+        .rank-col { color: #facc15; font-weight: bold; font-size: 1.4rem; text-align: center; }
+        
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* Focus pro editovatelný nadpis */
+        [contenteditable="true"]:focus {
+            outline: none;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 0.5rem;
+            padding: 0 0.5rem;
+        }
+
+        /* --- Mobilní úpravy --- */
+        @media (max-width: 768px) {
+            th { padding: 10px 8px; font-size: 0.75rem; }
+            td { padding: 10px 8px; font-size: 0.95rem; }
+            .rank-col { font-size: 1.1rem; }
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen">
+
+    <header class="bg-black/80 p-3 md:p-4 flex flex-col md:flex-row justify-between items-center gap-3 border-b border-slate-800 shrink-0">
+        <div class="flex flex-col items-center md:items-start">
+            <h1 id="race-title" contenteditable="true" class="text-xl md:text-3xl font-bold tracking-widest text-white uppercase transition-colors hover:bg-white/10 cursor-text px-2 -ml-2 rounded">Sprint Výsledky</h1>
+            <div id="race-date" class="text-slate-400 text-xs md:text-sm font-semibold tracking-wide mt-1 ml-1"></div>
+        </div>
+        
+        <div class="flex flex-wrap justify-center items-center gap-3 md:gap-4">
+            <button id="autoplay-btn" onclick="toggleAutoPlay()" class="flex items-center gap-2 bg-emerald-600/20 text-emerald-400 border border-emerald-600 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold transition-colors">
+                <span id="autoplay-icon">▶</span>
+                <span id="autoplay-text">AUTO-TV: ZAPNUTO</span>
+            </button>
+
+            <span id="last-update" class="text-gray-400 text-xs md:text-sm hidden md:inline">Načítám...</span>
+            
+            <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 md:px-4 md:py-2 rounded-full border border-slate-700">
+                <div class="w-2.5 h-2.5 md:w-3 md:h-3 rounded-full bg-red-500 animate-pulse" id="status-dot"></div>
+                <span class="text-xs md:text-sm font-bold tracking-wider" id="status-text">LIVE</span>
+            </div>
+        </div>
+    </header>
+
+    <div class="bg-slate-900 border-b border-slate-800 w-full shrink-0 z-10 shadow-md">
+        <!-- Vodorovné scrollování pro dotykové televize/mobily -->
+        <div id="category-tabs" class="flex overflow-x-auto py-3 md:py-4 px-3 md:px-4 gap-2 md:gap-3 items-center w-full scrollbar-hide" style="-webkit-overflow-scrolling: touch; scroll-behavior: smooth;">
+            <span class="text-slate-500 text-sm italic">Hledám kategorie v datech...</span>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead id="table-head">
+            </thead>
+            <tbody id="table-body">
+                <tr><td class="text-center py-20 text-xl text-gray-500">Čekám na spojení a první data...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        // === ZDE VLOŽTE SVOJI GOOGLE SCRIPT URL PRO SPRINT ===
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgOHhFF6zK7alBS4N1WG0G-P_A_AmCoFTAXe28IG_NG7FQ711-9niBj8YvdPEegKcdow/exec'; 
+
+        const FETCH_INTERVAL = 10000; 
+        const AUTOPLAY_INTERVAL = 10000; 
+        
+        let allData = [];
+        let headers = [];
+        let categories = [];
+        let currentCategory = 'Vše';
+        let categoryColumnIndex = -1;
+        
+        let isAutoPlay = true;
+        let autoPlayTimer = null;
+
+        async function fetchResults() {
+            if (!GOOGLE_SCRIPT_URL || !GOOGLE_SCRIPT_URL.startsWith('http')) {
+                document.getElementById('table-body').innerHTML = `<tr><td colspan="100%" class="text-center py-20 text-red-500 font-bold text-xl">CHYBA: Zadejte prosím URL adresu vašeho Google Apps Scriptu do kódu!</td></tr>`;
+                document.getElementById('status-dot').className = 'w-3 h-3 rounded-full bg-red-500';
+                document.getElementById('last-update').textContent = 'Chybí URL adresa';
+                document.getElementById('last-update').classList.remove('hidden');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${GOOGLE_SCRIPT_URL}?action=getResults`);
+                const data = await response.json();
+                
+                if (data.error) throw new Error(data.error);
+                if (!data || data.length === 0) return;
+
+                headers = data[0];
+                allData = data.slice(1).filter(row => row[0] && row[0] !== ''); 
+
+                categoryColumnIndex = headers.findIndex(h => {
+                    const hLow = h.toLowerCase().trim();
+                    return hLow === 'kategorie' || hLow === 'kat.' || hLow === 'kat' || hLow === 'category';
+                });
+
+                if (categoryColumnIndex !== -1) {
+                    const rawCategories = allData.map(row => row[categoryColumnIndex]).filter(c => c && c.trim() !== '');
+                    const uniqueCats = [...new Set(rawCategories)];
+                    
+                    let newCategories = [...uniqueCats];
+                    const baseTypes = ['R2', 'R4', 'R6', 'C1', 'C2', 'K1', 'SUP'];
+                    let virtualCats = [];
+                    
+                    baseTypes.forEach(type => {
+                        const matchingCats = uniqueCats.filter(c => c.toUpperCase().includes(type));
+                        if (matchingCats.length > 1) {
+                            virtualCats.push(`Vše ${type}`);
+                        }
+                    });
+                    
+                    if (virtualCats.length > 0) {
+                        newCategories = [...virtualCats, ...newCategories];
+                    }
+
+                    if (JSON.stringify(categories) !== JSON.stringify(newCategories)) {
+                        categories = newCategories;
+                        renderCategoryTabs();
+                        
+                        if (!categories.includes(currentCategory) && categories.length > 0) {
+                            currentCategory = categories[0];
+                        }
+                    }
+                }
+
+                renderTable();
+                
+                const now = new Date();
+                document.getElementById('last-update').textContent = `Akt. ${now.toLocaleTimeString('cs-CZ')}`;
+                const dot = document.getElementById('status-dot');
+                dot.classList.replace('bg-red-500', 'bg-green-500');
+                dot.classList.replace('bg-yellow-500', 'bg-green-500'); 
+                setTimeout(() => dot.classList.replace('bg-green-500', 'bg-red-500'), 1000);
+
+            } catch (error) {
+                console.error("Chyba:", error);
+                document.getElementById('status-dot').className = 'w-3 h-3 rounded-full bg-yellow-500';
+            }
+        }
+
+        function renderCategoryTabs() {
+            const container = document.getElementById('category-tabs');
+            let html = '';
+            
+            categories.forEach(cat => {
+                const isActive = cat === currentCategory;
+                let activeClasses = '';
+                if (isActive) {
+                    if (cat.startsWith('Vše ')) {
+                        activeClasses = 'bg-amber-600 text-white shadow-md shadow-amber-900/50 scale-105';
+                    } else {
+                        activeClasses = 'bg-blue-600 text-white shadow-md shadow-blue-900/50 scale-105';
+                    }
+                } else {
+                    activeClasses = 'bg-slate-800 text-slate-300 hover:bg-slate-700';
+                }
+                
+                html += `<button onclick="selectCategory('${cat}')" class="px-4 md:px-5 py-1.5 md:py-2 rounded-full whitespace-nowrap font-bold text-xs md:text-sm transition-all duration-300 ${activeClasses}">${cat}</button>`;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        function selectCategory(cat) {
+            currentCategory = cat;
+            renderCategoryTabs();
+            renderTable();
+            
+            setTimeout(() => {
+                const activeBtn = document.querySelector('#category-tabs button.scale-105');
+                if (activeBtn) {
+                    activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                }
+            }, 50);
+        }
+
+        function toggleAutoPlay() {
+            isAutoPlay = !isAutoPlay;
+            const btn = document.getElementById('autoplay-btn');
+            const text = document.getElementById('autoplay-text');
+            const icon = document.getElementById('autoplay-icon');
+            
+            if (isAutoPlay) {
+                btn.className = 'flex items-center gap-2 bg-emerald-600/20 text-emerald-400 border border-emerald-600 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold transition-colors';
+                text.textContent = 'AUTO-TV: ZAPNUTO';
+                icon.textContent = '▶';
+                startAutoPlayTimer();
+            } else {
+                btn.className = 'flex items-center gap-2 bg-slate-700 text-slate-400 border border-slate-600 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold transition-colors hover:text-white';
+                text.textContent = 'AUTO-TV: VYPNUTO';
+                icon.textContent = '⏸';
+                clearInterval(autoPlayTimer);
+            }
+        }
+
+        function startAutoPlayTimer() {
+            clearInterval(autoPlayTimer);
+            autoPlayTimer = setInterval(() => {
+                if (categories.length > 1) {
+                    let currentIndex = categories.indexOf(currentCategory);
+                    let nextIndex = (currentIndex + 1) % categories.length;
+                    selectCategory(categories[nextIndex]);
+                }
+            }, AUTOPLAY_INTERVAL);
+        }
+
+        function renderTable() {
+            const thead = document.getElementById('table-head');
+            const tbody = document.getElementById('table-body');
+            
+            let dataToShow = [...allData]; 
+            if (categoryColumnIndex !== -1 && categories.length > 0) {
+                if (currentCategory.startsWith('Vše ')) {
+                    const searchType = currentCategory.replace('Vše ', '');
+                    dataToShow = allData.filter(row => {
+                        const cat = row[categoryColumnIndex];
+                        return cat && cat.toUpperCase().includes(searchType);
+                    });
+                } else if (currentCategory !== 'Vše') {
+                    dataToShow = allData.filter(row => row[categoryColumnIndex] === currentCategory);
+                }
+            }
+
+            // Hledání speciálních sloupců pro Sprint
+            let celkemIndex = headers.findIndex(h => {
+                let l = h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return l === 'celkem' || l === 'vysledek' || l.includes('vysledny');
+            });
+            let kolo1Index = headers.findIndex(h => {
+                let l = h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return l.includes('1. kolo') || l.includes('1.kolo') || l.includes('cas 1');
+            });
+            let kolo2Index = headers.findIndex(h => {
+                let l = h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return l.includes('2. kolo') || l.includes('2.kolo') || l.includes('cas 2');
+            });
+
+            // Inteligentní detekce, jestli se v kategorii vůbec jelo 2. kolo
+            let hasRound2 = true; 
+            if (kolo2Index !== -1 && dataToShow.length > 0) {
+                hasRound2 = dataToShow.some(row => {
+                    let val = row[kolo2Index];
+                    if (val === undefined || val === null) return false;
+                    val = val.toString().trim();
+                    return val !== '' && val !== '-';
+                });
+            }
+
+            const visibleColumns = headers.map((_, colIndex) => {
+                const headerText = headers[colIndex].toLowerCase();
+                const headerNormalized = headerText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                
+                if (headerNormalized.includes('poradi')) return false; 
+                
+                // Skrytí sloupců 2. kola, pokud ho nikdo nejel
+                if (!hasRound2) {
+                    if (colIndex === kolo2Index) return false;
+                }
+
+                if (dataToShow.length === 0) return true;
+
+                return dataToShow.some(row => {
+                    let val = row[colIndex];
+                    if (val === undefined || val === null) return false;
+                    val = val.toString().trim();
+                    return val !== '' && val !== '-';
+                });
+            });
+
+            let parseTime = (v) => {
+                if (!v || v.toString().trim() === '' || v.toString().trim() === '-') return null;
+                let str = v.toString().toLowerCase().trim();
+                if (str.includes('čeká') || str.includes('dnf') || str.includes('dns') || str.includes('dsq')) return Infinity;
+                
+                if (str.includes(':')) {
+                    let parts = str.split(':');
+                    if (parts.length === 2) {
+                        let m = parseFloat(parts[0]) || 0;
+                        let s = parseFloat(parts[1].replace(',', '.')) || 0;
+                        return (m * 60) + s;
+                    }
+                }
+                let num = parseFloat(str.replace(',', '.'));
+                return isNaN(num) ? Infinity : num;
+            };
+
+            dataToShow.sort((a, b) => {
+                // Najde nejlepší čas pro závodníka A (Priorita je Celkem. Pokud chybí, vezme 1. Kolo)
+                let pA_celkem = celkemIndex !== -1 ? parseTime(a[celkemIndex]) : null;
+                let pA_1 = kolo1Index !== -1 ? parseTime(a[kolo1Index]) : null;
+                let pA = (pA_celkem !== null && pA_celkem !== Infinity) ? pA_celkem : (pA_1 !== null ? pA_1 : Infinity);
+
+                // To samé pro B
+                let pB_celkem = celkemIndex !== -1 ? parseTime(b[celkemIndex]) : null;
+                let pB_1 = kolo1Index !== -1 ? parseTime(b[kolo1Index]) : null;
+                let pB = (pB_celkem !== null && pB_celkem !== Infinity) ? pB_celkem : (pB_1 !== null ? pB_1 : Infinity);
+
+                if (pA === pB) return 0;
+                if (pA === Infinity) return 1;
+                if (pB === Infinity) return -1;
+                return pA > pB ? 1 : -1;
+            });
+
+            let theadHTML = '<tr><th class="w-12 md:w-16 text-center text-yellow-500 font-bold">POŘ.</th>';
+            headers.forEach((header, index) => {
+                if (!visibleColumns[index]) return; 
+                theadHTML += `<th>${header}</th>`;
+            });
+            theadHTML += '</tr>';
+            thead.innerHTML = theadHTML;
+
+            let tbodyHTML = '';
+            let validRank = 1; 
+            
+            dataToShow.forEach((row, rowIndex) => {
+                tbodyHTML += '<tr>';
+                
+                // Zjištění konečného času daného řádku (pro kontrolu validity a zvýraznění)
+                let hasValidResult = true;
+                let pRow_celkem = celkemIndex !== -1 ? parseTime(row[celkemIndex]) : null;
+                let pRow_1 = kolo1Index !== -1 ? parseTime(row[kolo1Index]) : null;
+                let pRow = (pRow_celkem !== null && pRow_celkem !== Infinity) ? pRow_celkem : (pRow_1 !== null ? pRow_1 : Infinity);
+
+                if (pRow === Infinity || pRow === null) {
+                    hasValidResult = false;
+                }
+
+                // Rozhodneme, který sloupec budeme svítit zeleně jako "Finální výsledek"
+                let highlightIndex = -1;
+                if (hasValidResult) {
+                    if (pRow_celkem !== null && pRow_celkem !== Infinity) {
+                        highlightIndex = celkemIndex;
+                    } else if (pRow_1 !== null && pRow_1 !== Infinity) {
+                        highlightIndex = kolo1Index;
+                    }
+                }
+
+                if (hasValidResult) {
+                    tbodyHTML += `<td class="rank-col">${validRank}.</td>`;
+                    validRank++;
+                } else {
+                    tbodyHTML += `<td class="rank-col" style="color: #475569;">-</td>`;
+                }
+                
+                row.forEach((cell, index) => {
+                    if (!visibleColumns[index]) return; 
+
+                    const headerText = headers[index].toLowerCase();
+                    let classNames = 'whitespace-nowrap '; 
+                    let displayCell = cell !== '' ? cell : '-';
+
+                    if (typeof displayCell === 'string' && displayCell.includes('Čeká')) {
+                        classNames += 'text-amber-500 ';
+                    } else if (headerText.includes('st.') || headerText.includes('číslo') || headerText.includes('bib')) {
+                        classNames += 'text-blue-400 font-bold text-center ';
+                    } 
+                    // Pokud je toto buňka s finálním výsledným časem pro TOHOTO závodníka -> ZELENĚ
+                    else if (index === highlightIndex) {
+                        classNames += 'text-emerald-400 font-bold text-xl md:text-2xl bg-emerald-900/20 px-2 rounded-md ';
+                    }
+
+                    // Vizuální indikátor pro "2. kolo nejel" pokud se v kategorii jinak jezdí
+                    if (index === kolo2Index && displayCell === '-') {
+                        displayCell = `<span class="text-slate-500 text-xs uppercase tracking-widest opacity-60">1 jízda</span>`;
+                    }
+
+                    tbodyHTML += `<td class="${classNames}">${displayCell}</td>`;
+                });
+                tbodyHTML += '</tr>';
+            });
+
+            if (tbodyHTML === '') {
+                tbody.innerHTML = `<tr><td colspan="${headers.length + 1}" class="text-center py-20 text-xl text-gray-500">Zatím žádná data pro tuto kategorii...</td></tr>`;
+            } else {
+                tbody.innerHTML = tbodyHTML;
+            }
+        }
+
+        // Uložení nadpisu do mezipaměti
+        const titleEl = document.getElementById('race-title');
+        const savedTitle = localStorage.getItem('sprintRaceTitle');
+        if (savedTitle) {
+            titleEl.textContent = savedTitle;
+        }
+        titleEl.addEventListener('blur', function() {
+            localStorage.setItem('sprintRaceTitle', this.textContent);
+        });
+        titleEl.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.blur();
+            }
+        });
+
+        const dateEl = document.getElementById('race-date');
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        dateEl.textContent = new Date().toLocaleDateString('cs-CZ', options);
+
+        fetchResults();
+        setInterval(fetchResults, FETCH_INTERVAL);
+        if (isAutoPlay) startAutoPlayTimer();
+
+    </script>
+</body>
+</html>
