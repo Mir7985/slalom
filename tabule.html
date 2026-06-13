@@ -368,11 +368,17 @@
                         
                         if (typeof displayCell === 'string' && displayCell !== '-') {
                             
-                            // 1. Zvýraznění konkrétních chyb (50 a 5 po šipce ➔ nebo -> )
-                            // Nahrazuje text jako "➔ 50" nebo "-> 5" a uchová před i za ním případné mezery nebo oddělovače |
-                            displayCell = displayCell
-                                .replace(/([➔>-]\s*)(50)(\s*\||\s*$)/g, '$1<strong class="text-red-400 font-black drop-shadow-sm text-base">50</strong>$3')
-                                .replace(/([➔>-]\s*)(5)(\s*\||\s*$)/g, '$1<strong class="text-amber-400 font-black drop-shadow-sm text-base">5</strong>$3');
+                            // 1. Zvýraznění konkrétních chyb a absolutní zákaz odřádkování (nowrap) uvnitř záznamu jedné branky
+                            displayCell = displayCell.replace(/([^\s|]+)\s*([➔>\-:])\s*(\d+)\b/g, function(match, p1, p2, p3) {
+                                if (p3 === '50') {
+                                    return `<span class="whitespace-nowrap">${p1} ${p2} <strong class="text-red-400 font-black drop-shadow-sm text-base">50</strong></span>`;
+                                } else if (p3 === '5') {
+                                    return `<span class="whitespace-nowrap">${p1} ${p2} <strong class="text-amber-400 font-black drop-shadow-sm text-base">5</strong></span>`;
+                                } else {
+                                    // Ostatní čísla (např. 0) nebudou barevná, ale zůstanou slepená s textem branky
+                                    return `<span class="whitespace-nowrap">${p1} ${p2} ${p3}</span>`;
+                                }
+                            });
 
                             // 2. Oddělení kol (pokud tabulka sama pošle nový řádek nebo znak \n)
                             // Oddělíme řádky, případně zkusíme najít text "1. kolo" a "2. kolo"
