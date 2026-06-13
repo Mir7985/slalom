@@ -5,21 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Slalom Hlídky</title>
 
-    <!-- Meta tagy pro iOS (Apple) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Hlídky">
 
-    <!-- Meta tagy pro starší Android -->
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#10b981">
 
-    <!-- Dynamické generování Manifestu -->
     <script>
         (function() {
             const currentUrl = window.location.href.split('?')[0].split('#')[0];
-            
-            // Zelená ikonka s písmenem H pro hlídky
             const iconData = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' fill='%2310b981'/%3E%3Ctext x='256' y='360' font-family='Arial' font-size='300' font-weight='bold' fill='white' text-anchor='middle'%3EH%3C/text%3E%3C/svg%3E";
 
             const manifest = {
@@ -64,7 +59,6 @@
             animation: spin 1s linear infinite;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        /* Skrytí šipek v číselném inputu pro čistší vzhled */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { 
             -webkit-appearance: none; margin: 0; 
@@ -72,12 +66,18 @@
     </style>
 </head>
 <body class="p-4 sm:p-6 text-gray-800">
+
+    <!-- Toast Notifikace (Vyskakovací bublina pro hlídky) - Zvětšeno -->
+    <div id="toast-notification" class="fixed top-4 left-4 right-4 sm:left-1/2 sm:w-96 sm:-ml-48 bg-gray-800 text-white text-xl font-bold px-6 py-5 rounded-2xl shadow-2xl z-50 transition-all duration-300 opacity-0 translate-y-[-100%] pointer-events-none flex items-center gap-4 border-l-8 border-emerald-400">
+        <svg class="w-10 h-10 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+        <span id="toast-message" class="leading-tight"></span>
+    </div>
+
     <div class="max-w-md mx-auto bg-white rounded-xl shadow-lg p-6 border-t-8 border-emerald-500">
         <h1 class="text-2xl font-bold text-center mb-6 text-emerald-600">Hlídky - Penalizace</h1>
 
         <div id="setup-section" class="space-y-4">
             
-            <!-- Výběr stanoviště -->
             <div>
                 <label class="block text-sm font-semibold mb-1">Stanoviště (1-6):</label>
                 <select id="station-select" class="w-full p-2 border-2 border-gray-300 rounded-lg focus:border-emerald-500 focus:outline-none text-lg">
@@ -91,7 +91,6 @@
                 </select>
             </div>
 
-            <!-- Nastavení branek pro stanoviště -->
             <div class="flex gap-4">
                 <div class="flex-1">
                     <label class="block text-sm font-semibold mb-1">Od branky č.:</label>
@@ -103,7 +102,6 @@
                 </div>
             </div>
 
-            <!-- Tlačítko pro zahájení -->
             <button class="btn w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg mt-4 disabled:opacity-50" id="start-btn" onclick="initStation()" disabled>Pokračovat k zadávání</button>
         </div>
 
@@ -120,18 +118,15 @@
                 <button onclick="resetSetup()" class="text-sm text-red-500 underline">Změnit</button>
             </div>
 
-            <!-- Startovní číslo -->
             <div>
                 <label for="bib-number" class="block text-sm font-semibold mb-1 text-center">Startovní číslo hlídky:</label>
                 <input type="number" id="bib-number" class="w-full text-center text-4xl p-3 border-2 border-gray-300 rounded-xl focus:border-emerald-500 focus:outline-none font-bold" placeholder="000" inputmode="numeric">
             </div>
 
-            <!-- Dynamicky generované branky -->
             <div id="gates-container" class="space-y-3">
                 <p class="text-center text-gray-500 text-sm">Načítám branky...</p>
             </div>
 
-            <!-- Odeslat -->
             <button id="submit-btn" class="btn w-full flex items-center justify-center gap-2 py-4 bg-gray-800 hover:bg-black text-white text-xl font-bold rounded-xl shadow-md" onclick="submitData()">
                 <span id="submit-text">Odeslat data</span>
                 <div id="submit-spinner" class="spinner hidden"></div>
@@ -142,12 +137,13 @@
     </div>
 
     <script>
-        // --- ZDE VLOŽTE SVOJI STEJNOU ADRESU Z GOOGLE APPS SCRIPTU JAKO MINULE ---
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyC3-bmwnFnS4B5Scgyn88BuUYL40BJSERcNBNdml44hGP9MSijgB7qwGFmtZPS2HKszQ/exec'; 
+        // --- ZDE VLOŽTE SVOJI ADRESU Z GOOGLE APPS SCRIPTU ---
+        const GOOGLE_SCRIPT_URL = 'VLOZTE_URL_VASEHO_APPS_SCRIPTU'; 
         
         let currentStation = null;
         let currentGateStart = null;
         let currentGateEnd = null;
+        let toastTimeout;
 
         document.addEventListener('DOMContentLoaded', () => {
             const stationSelect = document.getElementById('station-select');
@@ -160,7 +156,6 @@
             const gateStart = parseInt(document.getElementById('gate-start').value);
             const gateEnd = parseInt(document.getElementById('gate-end').value);
             
-            // Už nevyžadujeme výběr kola, jen stanoviště a branky
             if (station && gateStart >= 1 && gateEnd >= gateStart && gateEnd <= 18) {
                 startBtn.disabled = false;
             } else {
@@ -218,15 +213,16 @@
             const bibNumber = document.getElementById('bib-number').value.trim();
             if (!bibNumber) { showStatus('Zadejte startovní číslo hlídky!', 'error'); return; }
 
-            // Posbíráme hodnoty ze všech inputů branek
             let currentPenalties = {};
             for (let i = currentGateStart; i <= currentGateEnd; i++) {
                 let inputVal = document.getElementById(`gate-input-${i}`).value;
-                // Pokud je pole prázdné, zapíšeme 0, jinak zapíšeme číslo
                 currentPenalties[i] = inputVal === '' ? 0 : parseInt(inputVal);
             }
 
-            // Kolo posíláme natvrdo jako "Hlídky"
+            // Uložíme si data pro zobrazení v toastu
+            const submittedBib = bibNumber;
+            const submittedPenalties = {...currentPenalties};
+
             const dataPayload = { 
                 action: 'savePenalty', 
                 kolo: 'Hlídky', 
@@ -237,11 +233,11 @@
 
             setLoadingState(true);
             try {
-                if(GOOGLE_SCRIPT_URL === 'VLOZTE_URL_VASEHO_APPS_SCRIPTU') {
-                    setTimeout(() => { handleSuccess(); }, 1000); return;
+                if(GOOGLE_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbyC3bmwnFnS4B5Scgyn88BuUYL40BJSERcNBNdml44hGP9MSijgB7qwGFmtZPS2HKszQ/exec') {
+                    setTimeout(() => { handleSuccess(submittedBib, submittedPenalties); }, 1000); return;
                 }
                 const response = await fetch(GOOGLE_SCRIPT_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(dataPayload) });
-                handleSuccess();
+                handleSuccess(submittedBib, submittedPenalties);
             } catch (error) {
                 showStatus('Chyba připojení. Zkuste to znovu.', 'error');
             } finally {
@@ -249,18 +245,58 @@
             }
         }
 
-        function handleSuccess() {
-            showStatus(`Data pro hlídku ${document.getElementById('bib-number').value} uložena!`, 'success');
-            document.getElementById('bib-number').value = '';
+        function handleSuccess(bib, penalties) {
+            // Zobrazení toast zprávy
+            showToast(bib, penalties);
             
-            // Vymažeme hodnoty ve všech inputech pro branky
+            document.getElementById('bib-number').value = '';
             for (let i = currentGateStart; i <= currentGateEnd; i++) {
                 document.getElementById(`gate-input-${i}`).value = '';
             }
             
             document.getElementById('bib-number').focus();
-            setTimeout(hideStatus, 3000);
+            hideStatus();
         }
+
+        // --- FUNKCE PRO TOAST NOTIFIKACI ---
+        function showToast(bib, penalties) {
+            const toast = document.getElementById('toast-notification');
+            const toastMsg = document.getElementById('toast-message');
+            
+            let penaltyDetails = [];
+            // Vypíše jen čisté hodnoty v pořadí branek na stanovišti (0, 50, 0)
+            for (let i = currentGateStart; i <= currentGateEnd; i++) {
+                penaltyDetails.push(penalties[i]);
+            }
+            
+            let msg = `Hlídka ${bib} uložena. (${penaltyDetails.join(', ')})`;
+
+            toastMsg.textContent = msg;
+            
+            toast.classList.remove('opacity-0', 'translate-y-[-100%]', 'pointer-events-none');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            
+            if (toastTimeout) clearTimeout(toastTimeout);
+            
+            // Zmizí po 15 sekundách
+            toastTimeout = setTimeout(hideToast, 15000);
+            
+            document.addEventListener('touchstart', hideToastOnTouch, {once: true});
+            document.addEventListener('mousedown', hideToastOnTouch, {once: true});
+        }
+
+        function hideToastOnTouch() {
+            hideToast();
+        }
+
+        function hideToast() {
+            const toast = document.getElementById('toast-notification');
+            toast.classList.remove('opacity-100', 'translate-y-0');
+            toast.classList.add('opacity-0', 'translate-y-[-100%]', 'pointer-events-none');
+            document.removeEventListener('touchstart', hideToastOnTouch);
+            document.removeEventListener('mousedown', hideToastOnTouch);
+        }
+        // -----------------------------------
 
         function setLoadingState(isLoading) {
             const btn = document.getElementById('submit-btn');
