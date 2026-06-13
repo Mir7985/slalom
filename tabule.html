@@ -357,42 +357,61 @@
                     if (!visibleColumns[index]) return; 
 
                     const headerText = headers[index].toLowerCase();
+                    const headerNormalized = headerText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                     let classNames = 'whitespace-nowrap '; 
                     let displayCell = cell !== '' ? cell : '-';
 
-                    // --- BAREVNÉ ZALOMENÍ POSLEDNÍHO SLOUPCE (Detaily penalizací) ---
-                    if (index === lastVisibleIndex) {
-                        classNames = 'text-[0.95rem] leading-relaxed min-w-[450px] xl:min-w-[500px] whitespace-nowrap ';
+                    // --- BAREVNÉ ZALOMENÍ SLOUPCE S PENALIZACEMI ---
+                    // Nyní se aktivuje vždy, když se sloupec jmenuje "penalizace" NEBO je to úplně poslední sloupec
+                    if (headerNormalized.includes('penalizace') || index === lastVisibleIndex) {
+                        classNames = 'text-[0.95rem] leading-relaxed min-w-[450px] xl:min-w-[500px] whitespace-normal ';
                         
-                        if (typeof displayCell === 'string') {
+                        if (typeof displayCell === 'string' && displayCell !== '-') {
                             
-                            // 1. Zvýraznění konkrétních chyb (5 oranžově, 50 červeně)
+                            // 1. Zvýraznění konkrétních chyb (50 a 5 po šipce ➔ nebo -> )
+                            // Nahrazuje text jako "➔ 50" nebo "-> 5" a uchová před i za ním případné mezery nebo oddělovače |
                             displayCell = displayCell
-                                .replace(/:\s*(50)\b/g, ': <strong class="text-red-400 font-black drop-shadow-sm text-base">50</strong>')
-                                .replace(/:\s*(5)\b/g, ': <strong class="text-amber-400 font-black drop-shadow-sm text-base">5</strong>');
+                                .replace(/([➔>-]\s*)(50)(\s*\||\s*$)/g, '$1<strong class="text-red-400 font-black drop-shadow-sm text-base">50</strong>$3')
+                                .replace(/([➔>-]\s*)(5)(\s*\||\s*$)/g, '$1<strong class="text-amber-400 font-black drop-shadow-sm text-base">5</strong>$3');
 
-                            // 2. Obarvení řádků kol a vytvoření odznáčků
-                            displayCell = displayCell
-                                .replace(/(1\.\s*kolo|1\.kolo)(.*?)(?=(2\.\s*kolo|2\.kolo|$))/gi, '<div class="text-blue-100 mb-1.5 flex items-center"><span class="bg-blue-900/80 text-blue-200 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider mr-3 shadow-sm border border-blue-700/50">1. kolo</span> <span class="opacity-90">$2</span></div>')
-                                .replace(/(2\.\s*kolo|2\.kolo)(.*)/gi, '<div class="text-emerald-100 flex items-center"><span class="bg-emerald-900/80 text-emerald-200 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider mr-3 shadow-sm border border-emerald-700/50">2. kolo</span> <span class="opacity-90">$2</span></div>');
+                            // 2. Oddělení kol (pokud tabulka sama pošle nový řádek nebo znak \n)
+                            // Oddělíme řádky, případně zkusíme najít text "1. kolo" a "2. kolo"
+                            let lines = displayCell.split('\n');
                             
-                            // 3. Začištění přebytečných dvojteček hned za odznáčkem
-                            displayCell = displayCell.replace(/<\/span>\s*:\s*/g, '</span>');
-
-                            // 4. Fallback, pokud by v buňce chyběl text s koly (např. u diskvalifikace)
-                            if (!displayCell.includes('<div')) {
-                                displayCell = `<div class="text-slate-300">${displayCell}</div>`;
+                            // Pokud je v textu jen jeden řádek a je tam manuálně napsáno 1. a 2. kolo, rozdělíme to
+                            if (lines.length === 1 && /(1\.\s*kolo|1\.kolo|1\s*kolo)/i.test(displayCell) && /(2\.\s*kolo|2\.kolo|2\s*kolo)/i.test(displayCell)) {
+                                displayCell = displayCell
+                                    .replace(/(1\.\s*kolo|1\.kolo|1\s*kolo)[:\s-]*(.*?)(?=(2\.\s*kolo|2\.kolo|2\s*kolo|$))/gi, '<div class="text-blue-100 mb-2 flex items-start"><span class="bg-blue-900/80 text-blue-200 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider mr-3 shadow-sm border border-blue-700/50 mt-0.5 whitespace-nowrap">1. kolo</span> <span class="opacity-90 whitespace-normal leading-relaxed">$2</span></div>')
+                                    .replace(/(2\.\s*kolo|2\.kolo|2\s*kolo)[:\s-]*(.*)/gi, '<div class="text-emerald-100 flex items-start"><span class="bg-emerald-900/80 text-emerald-200 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider mr-3 shadow-sm border border-emerald-700/50 mt-0.5 whitespace-nowrap">2. kolo</span> <span class="opacity-90 whitespace-normal leading-relaxed">$2</span></div>');
+                            } else if (lines.length > 1) {
+                                // Pokud tam už jsou fyzicky nové řádky (např z CHAR(10) v Google Sheets)
+                                let newDisplayCell = '';
+                                lines.forEach((line, i) => {
+                                    if (line.trim() !== '') {
+                                         let koloText = i === 0 ? "1. kolo" : "2. kolo";
+                                         let koloColor = i === 0 ? "blue" : "emerald";
+                                         // Zbavíme se případného nadbytečného textu "1. kolo" v datech, protože si generujeme vlastní hezčí badge
+                                         let cleanLine = line.replace(/(1\.\s*kolo|2\.\s*kolo|1\.kolo|2\.kolo|1\s*kolo|2\s*kolo)[:\s-]*/gi, '').trim();
+                                         if(cleanLine !== "") {
+                                            newDisplayCell += `<div class="text-${koloColor}-100 mb-2 flex items-start"><span class="bg-${koloColor}-900/80 text-${koloColor}-200 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider mr-3 shadow-sm border border-${koloColor}-700/50 mt-0.5 whitespace-nowrap">${koloText}</span> <span class="opacity-90 whitespace-normal leading-relaxed">${cleanLine}</span></div>`;
+                                         }
+                                    }
+                                });
+                                displayCell = newDisplayCell !== '' ? newDisplayCell : displayCell;
+                            } else {
+                                // Fallback, pokud tam není vůbec žádný nový řádek ani přímo napsáno "1. kolo"
+                                displayCell = `<div class="text-slate-300 whitespace-normal leading-relaxed">${displayCell}</div>`;
                             }
                         }
-                    }
-
-                    // Podmíněné obarvování ostatních buněk tabulky
-                    if (typeof displayCell === 'string' && displayCell.includes('Čeká')) {
-                        classNames += 'text-amber-500 ';
-                    } else if (headerText.includes('st.') || headerText.includes('číslo') || headerText.includes('bib')) {
-                        classNames += 'text-blue-400 font-bold text-center ';
-                    } else if (index === sortIndex) {
-                        classNames += 'text-emerald-400 font-bold text-2xl ';
+                    } else {
+                        // Podmíněné obarvování ostatních buněk tabulky (pokud to NENÍ sloupec s detaily penalizací)
+                        if (typeof displayCell === 'string' && displayCell.includes('Čeká')) {
+                            classNames += 'text-amber-500 ';
+                        } else if (headerText.includes('st.') || headerText.includes('číslo') || headerText.includes('bib')) {
+                            classNames += 'text-blue-400 font-bold text-center ';
+                        } else if (index === sortIndex) {
+                            classNames += 'text-emerald-400 font-bold text-2xl ';
+                        }
                     }
 
                     tbodyHTML += `<td class="${classNames}">${displayCell}</td>`;
