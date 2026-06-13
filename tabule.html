@@ -360,17 +360,33 @@
                     let classNames = 'whitespace-nowrap '; 
                     let displayCell = cell !== '' ? cell : '-';
 
-                    // --- ZALOMENÍ POSLEDNÍHO SLOUPCE (Detaily penalizací) ---
+                    // --- BAREVNÉ ZALOMENÍ POSLEDNÍHO SLOUPCE (Detaily penalizací) ---
                     if (index === lastVisibleIndex) {
-                        // Zvýšena minimální šířka na 450px, aby se každé kolo vešlo na jeden řádek
-                        classNames = 'whitespace-pre-line text-[0.95rem] leading-relaxed text-slate-300 min-w-[450px] xl:min-w-[500px] ';
+                        classNames = 'text-[0.95rem] leading-relaxed min-w-[450px] xl:min-w-[500px] whitespace-nowrap ';
                         
                         if (typeof displayCell === 'string') {
-                            // Vynutí odřádkování přesně před slovem "2. kolo", aby to skočilo pod sebe
-                            displayCell = displayCell.replace(/(2\.\s*kolo|2\.kolo)/gi, '\n$1').replace(/\n+/g, '\n').trim();
+                            
+                            // 1. Zvýraznění konkrétních chyb (5 oranžově, 50 červeně)
+                            displayCell = displayCell
+                                .replace(/:\s*(50)\b/g, ': <strong class="text-red-400 font-black drop-shadow-sm text-base">50</strong>')
+                                .replace(/:\s*(5)\b/g, ': <strong class="text-amber-400 font-black drop-shadow-sm text-base">5</strong>');
+
+                            // 2. Obarvení řádků kol a vytvoření odznáčků
+                            displayCell = displayCell
+                                .replace(/(1\.\s*kolo|1\.kolo)(.*?)(?=(2\.\s*kolo|2\.kolo|$))/gi, '<div class="text-blue-100 mb-1.5 flex items-center"><span class="bg-blue-900/80 text-blue-200 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider mr-3 shadow-sm border border-blue-700/50">1. kolo</span> <span class="opacity-90">$2</span></div>')
+                                .replace(/(2\.\s*kolo|2\.kolo)(.*)/gi, '<div class="text-emerald-100 flex items-center"><span class="bg-emerald-900/80 text-emerald-200 px-2.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wider mr-3 shadow-sm border border-emerald-700/50">2. kolo</span> <span class="opacity-90">$2</span></div>');
+                            
+                            // 3. Začištění přebytečných dvojteček hned za odznáčkem
+                            displayCell = displayCell.replace(/<\/span>\s*:\s*/g, '</span>');
+
+                            // 4. Fallback, pokud by v buňce chyběl text s koly (např. u diskvalifikace)
+                            if (!displayCell.includes('<div')) {
+                                displayCell = `<div class="text-slate-300">${displayCell}</div>`;
+                            }
                         }
                     }
 
+                    // Podmíněné obarvování ostatních buněk tabulky
                     if (typeof displayCell === 'string' && displayCell.includes('Čeká')) {
                         classNames += 'text-amber-500 ';
                     } else if (headerText.includes('st.') || headerText.includes('číslo') || headerText.includes('bib')) {
