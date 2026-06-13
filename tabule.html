@@ -138,8 +138,27 @@
                     const rawCategories = allData.map(row => row[categoryColumnIndex]).filter(c => c && c.trim() !== '');
                     const uniqueCats = [...new Set(rawCategories)];
                     
-                    if (JSON.stringify(categories) !== JSON.stringify(uniqueCats)) {
-                        categories = uniqueCats;
+                    // --- VYTVOŘENÍ SLOUČENÝCH (META) KATEGORIÍ ---
+                    let newCategories = [...uniqueCats];
+                    const baseTypes = ['R2', 'R4', 'R6', 'C1', 'C2', 'K1', 'SUP'];
+                    let virtualCats = [];
+                    
+                    baseTypes.forEach(type => {
+                        // Zjistíme, kolik máme kategorií, které obsahují daný typ lodi (např. R4)
+                        const matchingCats = uniqueCats.filter(c => c.toUpperCase().includes(type));
+                        // Pokud je jich více než jedna, vytvoříme pro ně slučovací kategorii
+                        if (matchingCats.length > 1) {
+                            virtualCats.push(`Vše ${type}`);
+                        }
+                    });
+                    
+                    // Přidáme slučovací kategorie na úplný začátek (doleva)
+                    if (virtualCats.length > 0) {
+                        newCategories = [...virtualCats, ...newCategories];
+                    }
+
+                    if (JSON.stringify(categories) !== JSON.stringify(newCategories)) {
+                        categories = newCategories;
                         renderCategoryTabs();
                         
                         if (!categories.includes(currentCategory) && categories.length > 0) {
@@ -169,7 +188,18 @@
             
             categories.forEach(cat => {
                 const isActive = cat === currentCategory;
-                const activeClasses = isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-900/50 scale-105' : 'bg-slate-800 text-slate-300 hover:bg-slate-700';
+                // Sloučené meta kategorie budou mít trochu jinou (oranžovou/zlatou) barvu pro lepší odlišení, normální budou modré
+                let activeClasses = '';
+                if (isActive) {
+                    if (cat.startsWith('Vše ')) {
+                        activeClasses = 'bg-amber-600 text-white shadow-md shadow-amber-900/50 scale-105';
+                    } else {
+                        activeClasses = 'bg-blue-600 text-white shadow-md shadow-blue-900/50 scale-105';
+                    }
+                } else {
+                    activeClasses = 'bg-slate-800 text-slate-300 hover:bg-slate-700';
+                }
+                
                 html += `<button onclick="selectCategory('${cat}')" class="px-5 py-2 rounded-full whitespace-nowrap font-bold text-sm transition-all duration-300 ${activeClasses}">${cat}</button>`;
             });
             
@@ -181,7 +211,7 @@
             renderCategoryTabs();
             renderTable();
             
-            const activeBtn = document.querySelector('#category-tabs button.bg-blue-600');
+            const activeBtn = document.querySelector('#category-tabs button.scale-105');
             if (activeBtn) {
                 activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
             }
@@ -222,8 +252,18 @@
             const tbody = document.getElementById('table-body');
             
             let dataToShow = [...allData]; 
-            if (categoryColumnIndex !== -1 && currentCategory !== 'Vše' && categories.length > 0) {
-                dataToShow = allData.filter(row => row[categoryColumnIndex] === currentCategory);
+            if (categoryColumnIndex !== -1 && categories.length > 0) {
+                if (currentCategory.startsWith('Vše ')) {
+                    // Filtrování pro sloučenou meta kategorii
+                    const searchType = currentCategory.replace('Vše ', '');
+                    dataToShow = allData.filter(row => {
+                        const cat = row[categoryColumnIndex];
+                        return cat && cat.toUpperCase().includes(searchType);
+                    });
+                } else if (currentCategory !== 'Vše') {
+                    // Normální filtrování pro jednu specifickou kategorii
+                    dataToShow = allData.filter(row => row[categoryColumnIndex] === currentCategory);
+                }
             }
 
             // --- NOVINKA: Zjištění, zda se jelo 2. kolo ---
