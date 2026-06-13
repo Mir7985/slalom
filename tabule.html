@@ -43,8 +43,6 @@
 
         td {
             padding: 16px; border-bottom: 1px solid #334155; font-size: 1.15rem; 
-            /* Výchozí nastavení pro čísla a časy je na jednom řádku, mění se dynamicky pro jména */
-            white-space: nowrap; 
         }
 
         tbody tr:nth-child(even) { background-color: #1e293b; }
@@ -97,7 +95,7 @@
 
     <script>
         // === ZDE VLOŽTE SVOJI NOVOU GOOGLE SCRIPT URL ===
-        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbym3YfwxkeZ7LqmMKiBoqs7n_giuIRtfN3lZFzq7wV83lGHKgxSbCpjL2kUDDH_DN06/exec'; 
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwA_LHsjORNhd9mueGP_H_mp5RHHGK1EMpbs00xy-i3UkfIW_SwABAbUHNxAx3J3g3s/exec'; 
 
         const FETCH_INTERVAL = 10000; 
         const AUTOPLAY_INTERVAL = 10000; 
@@ -113,8 +111,7 @@
 
         async function fetchResults() {
             // Kontrola, zda uživatel vložil platnou URL
-            if (GOOGLE_SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbym3YfwxkeZ7LqmMKiBoqs7n_giuIRtfN3lZFzq7wV83lGHKgxSbCpjL2kUDDH_DN06/exec' 
-            || !GOOGLE_SCRIPT_URL.startsWith('http')) {
+            if (!GOOGLE_SCRIPT_URL || !GOOGLE_SCRIPT_URL.startsWith('http')) {
                 document.getElementById('table-body').innerHTML = `<tr><td colspan="100%" class="text-center py-20 text-red-500 font-bold text-xl">CHYBA: Zadejte prosím URL adresu vašeho Google Apps Scriptu do kódu!</td></tr>`;
                 document.getElementById('status-dot').className = 'w-3 h-3 rounded-full bg-red-500';
                 document.getElementById('last-update').textContent = 'Chybí URL adresa';
@@ -229,16 +226,37 @@
                 dataToShow = allData.filter(row => row[categoryColumnIndex] === currentCategory);
             }
 
-            // 1. Zjistíme, které sloupce skrýt (pokud v nich pro danou kategorii nejsou žádná data)
+            // --- NOVINKA: Zjištění, zda se jelo 2. kolo ---
+            let cas2Index = headers.findIndex(h => {
+                let l = h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return l.includes('cas 2') || l.includes('2. cas') || l.includes('2.cas');
+            });
+
+            let hasRound2 = true; 
+            if (cas2Index !== -1 && dataToShow.length > 0) {
+                hasRound2 = dataToShow.some(row => {
+                    let val = row[cas2Index];
+                    if (val === undefined || val === null) return false;
+                    val = val.toString().trim();
+                    return val !== '' && val !== '-';
+                });
+            }
+
+            // 1. Zjistíme, které sloupce skrýt
             const visibleColumns = headers.map((_, colIndex) => {
                 const headerText = headers[colIndex].toLowerCase();
-                // Staré pořadí importované z tabulky skrýváme vždy (děláme si lepší vlastní)
-                if (headerText.includes('pořadí') || headerText === 'poradi') return false; 
+                const headerNormalized = headerText.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
                 
-                // Pokud nemáme data, ukážeme vše
+                if (headerNormalized.includes('poradi')) return false; 
+                
+                if (!hasRound2) {
+                    if (headerNormalized.includes('cas 2') || headerNormalized.includes('pen 2') || headerNormalized.includes('trest 2') || headerNormalized.includes('2.kolo') || headerNormalized.includes('2kolo') || headerNormalized.includes('2. kolo')) {
+                        return false;
+                    }
+                }
+
                 if (dataToShow.length === 0) return true;
 
-                // Zkontrolujeme, jestli má alespoň jeden řádek v tomto sloupci nějakou smysluplnou hodnotu
                 return dataToShow.some(row => {
                     let val = row[colIndex];
                     if (val === undefined || val === null) return false;
@@ -246,6 +264,15 @@
                     return val !== '' && val !== '-';
                 });
             });
+
+            // --- Zjištění indexu úplně posledního zobrazeného sloupce ---
+            let lastVisibleIndex = -1;
+            for (let i = headers.length - 1; i >= 0; i--) {
+                if (visibleColumns[i]) {
+                    lastVisibleIndex = i;
+                    break;
+                }
+            }
 
             // 2. Hledáme sloupec s konečným výsledkem pro třídění
             let sortIndex = headers.findIndex(h => {
@@ -266,7 +293,7 @@
                     let parse = (v) => {
                         if (!v || v.toString().trim() === '') return Infinity; 
                         let str = v.toString().toLowerCase();
-                        if (str.includes('čeká') || str.includes('dnf') || str.includes('dns')) return Infinity; 
+                        if (str.includes('čeká') || str.includes('dnf') || str.includes('dns') || str.includes('dsq')) return Infinity; 
                         
                         if (str.includes(':')) {
                             let parts = str.split(':');
@@ -290,10 +317,10 @@
                 });
             }
 
-            // 4. Hlavička (s využitím pole visibleColumns)
+            // 4. Hlavička
             let theadHTML = '<tr><th class="w-16 text-center text-yellow-500 font-bold">POŘ.</th>';
             headers.forEach((header, index) => {
-                if (!visibleColumns[index]) return; // Přeskočíme prázdné sloupce
+                if (!visibleColumns[index]) return; 
                 theadHTML += `<th>${header}</th>`;
             });
             theadHTML += '</tr>';
@@ -301,23 +328,50 @@
 
             // 5. Tělo tabulky
             let tbodyHTML = '';
+            let validRank = 1; 
+            
             dataToShow.forEach((row, rowIndex) => {
                 tbodyHTML += '<tr>';
-                tbodyHTML += `<td class="rank-col">${rowIndex + 1}.</td>`;
+                
+                let hasValidResult = true;
+                if (sortIndex !== -1) {
+                    let val = row[sortIndex];
+                    if (!val || val.toString().trim() === '') {
+                        hasValidResult = false;
+                    } else {
+                        let str = val.toString().toLowerCase();
+                        if (str.includes('čeká') || str.includes('dnf') || str.includes('dns') || str.includes('dsq')) {
+                            hasValidResult = false;
+                        }
+                    }
+                }
+
+                if (hasValidResult) {
+                    tbodyHTML += `<td class="rank-col">${validRank}.</td>`;
+                    validRank++;
+                } else {
+                    tbodyHTML += `<td class="rank-col" style="color: #475569;">-</td>`;
+                }
                 
                 row.forEach((cell, index) => {
-                    if (!visibleColumns[index]) return; // Přeskočíme prázdné sloupce
+                    if (!visibleColumns[index]) return; 
 
                     const headerText = headers[index].toLowerCase();
-                    let classNames = '';
-                    
-                    // ZALAMOVÁNÍ TEXTU: Povolíme zalamování pouze u jmen/názvů
-                    if (headerText.includes('jméno') || headerText.includes('jmena') || headerText.includes('klub') || headerText.includes('název') || headerText.includes('posádka')) {
-                        classNames += 'whitespace-normal min-w-[200px] leading-tight ';
+                    let classNames = 'whitespace-nowrap '; 
+                    let displayCell = cell !== '' ? cell : '-';
+
+                    // --- ZALOMENÍ POSLEDNÍHO SLOUPCE (Detaily penalizací) ---
+                    if (index === lastVisibleIndex) {
+                        // Zvýšena minimální šířka na 450px, aby se každé kolo vešlo na jeden řádek
+                        classNames = 'whitespace-pre-line text-[0.95rem] leading-relaxed text-slate-300 min-w-[450px] xl:min-w-[500px] ';
+                        
+                        if (typeof displayCell === 'string') {
+                            // Vynutí odřádkování přesně před slovem "2. kolo", aby to skočilo pod sebe
+                            displayCell = displayCell.replace(/(2\.\s*kolo|2\.kolo)/gi, '\n$1').replace(/\n+/g, '\n').trim();
+                        }
                     }
 
-                    // Barvení a stylování buněk
-                    if (cell.includes('Čeká')) {
+                    if (typeof displayCell === 'string' && displayCell.includes('Čeká')) {
                         classNames += 'text-amber-500 ';
                     } else if (headerText.includes('st.') || headerText.includes('číslo') || headerText.includes('bib')) {
                         classNames += 'text-blue-400 font-bold text-center ';
@@ -325,7 +379,7 @@
                         classNames += 'text-emerald-400 font-bold text-2xl ';
                     }
 
-                    tbodyHTML += `<td class="${classNames}">${cell !== '' ? cell : '-'}</td>`;
+                    tbodyHTML += `<td class="${classNames}">${displayCell}</td>`;
                 });
                 tbodyHTML += '</tr>';
             });
