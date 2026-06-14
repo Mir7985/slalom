@@ -412,11 +412,16 @@
                     let classNames = 'whitespace-nowrap '; 
                     let displayCell = cell !== '' ? cell : '-';
 
-                    if (typeof displayCell === 'string' && displayCell.includes('Čeká')) {
+                   if (typeof displayCell === 'string' && displayCell.includes('Čeká')) {
                         classNames += 'text-amber-500 ';
                     } else if (headerText.includes('st.') || headerText.includes('číslo') || headerText.includes('bib')) {
                         classNames += 'text-blue-400 font-bold text-center ';
                     } 
+                    // === NOVÁ ČÁST PRO ZELENOU BARVU POSÁDKY ===
+                    else if (headerText.includes('posádka') || headerText.includes('posadka') || headerText.includes('jméno') || headerText.includes('jmeno')) {
+                        classNames += 'text-green-400 font-bold tracking-wide ';
+                    }
+                    // ===========================================
                     // Pokud je toto buňka s finálním výsledným časem pro TOHOTO závodníka -> ZELENĚ
                     else if (index === highlightIndex) {
                         classNames += 'text-emerald-400 font-bold text-xl md:text-2xl bg-emerald-900/20 px-2 rounded-md ';
