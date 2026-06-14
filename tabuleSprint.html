@@ -86,7 +86,11 @@
                 <span id="autoplay-icon">▶</span>
                 <span id="autoplay-text">AUTO-TV: ZAPNUTO</span>
             </button>
-
+            <button onclick="toggleFullScreen()" class="flex items-center gap-2 bg-slate-800 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold transition-colors hover:text-white hover:bg-slate-700">
+                <span>⛶</span>
+                <span>FULLSCREEN</span>
+            </button>
+            
             <span id="last-update" class="text-gray-400 text-xs md:text-sm hidden md:inline">Načítám...</span>
             
             <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 md:px-4 md:py-2 rounded-full border border-slate-700">
@@ -459,6 +463,19 @@
         setInterval(fetchResults, FETCH_INTERVAL);
         if (isAutoPlay) startAutoPlayTimer();
 
+        // Funkce pro zapnutí/vypnutí Fullscreenu
+function toggleFullScreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.warn(`Chyba Fullscreenu: ${err.message}`);
+        });
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+}
+        
     </script>
 </body>
 </html>
