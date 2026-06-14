@@ -85,7 +85,10 @@
                 <span id="autoplay-icon">▶</span>
                 <span id="autoplay-text">AUTO-TV: ZAPNUTO</span>
             </button>
-
+            <button onclick="toggleFullScreen()" class="flex items-center gap-2 bg-slate-800 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold transition-colors hover:text-white hover:bg-slate-700">
+                <span>⛶</span>
+                <span>FULLSCREEN</span>
+            </button>
             <span id="last-update" class="text-gray-400 text-xs md:text-sm hidden md:inline">Načítám...</span>
             
             <div class="flex items-center gap-2 bg-slate-800 px-3 py-1.5 md:px-4 md:py-2 rounded-full border border-slate-700">
@@ -446,15 +449,23 @@
                                 displayCell = `<div class="text-slate-300 whitespace-normal leading-relaxed">${displayCell}</div>`;
                             }
                         }
-                    } else {
+                   } else {
                         if (typeof displayCell === 'string' && displayCell.includes('Čeká')) {
-                            classNames += 'text-amber-500 ';
-                        } else if (headerText.includes('st.') || headerText.includes('číslo') || headerText.includes('bib')) {
-                            classNames += 'text-blue-400 font-bold text-center ';
-                        } else if (index === sortIndex) {
-                            classNames += 'text-emerald-400 font-bold text-xl md:text-2xl ';
-                        }
-                    }
+                        classNames += 'text-amber-500 ';
+                    } else if (headerText.includes('st.') || headerText.includes('číslo') || headerText.includes('bib')) {
+                        classNames += 'text-blue-400 font-bold text-center ';
+    
+    // === NOVÁ ČÁST PRO ZMĚNU BARVY POSÁDKY ===
+                } else if (headerText.includes('posádka') || headerText.includes('posadka') || headerText.includes('jméno') || headerText.includes('jmeno')) {
+        // Třída text-orange-400 změní barvu na oranžovou. 
+        // Můžete přepsat na jinou, např. text-cyan-400 (světle modrá), text-pink-400 (růžová) atd.
+                    classNames += 'text-orange-400 font-bold tracking-wide '; 
+    // =========================================
+
+    } else if (index === sortIndex) {
+        classNames += 'text-emerald-400 font-bold text-xl md:text-2xl ';
+    }
+}
 
                     tbodyHTML += `<td class="${classNames}">${displayCell}</td>`;
                 });
@@ -492,7 +503,18 @@
         fetchResults();
         setInterval(fetchResults, FETCH_INTERVAL);
         if (isAutoPlay) startAutoPlayTimer();
-
+// Funkce pro zapnutí/vypnutí Fullscreenu
+function toggleFullScreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.warn(`Chyba Fullscreenu: ${err.message}`);
+        });
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+}
     </script>
 </body>
 </html>
