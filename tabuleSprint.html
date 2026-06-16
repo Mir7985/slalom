@@ -157,8 +157,24 @@
                     return hLow === 'kategorie' || hLow === 'kat.' || hLow === 'kat' || hLow === 'category';
                 });
 
-                if (categoryColumnIndex !== -1) {
-                    const rawCategories = allData.map(row => row[categoryColumnIndex]).filter(c => c && c.trim() !== '');
+        if (categoryColumnIndex !== -1) {
+                    // Najdeme indexy sloupců, ve kterých se objevují výsledky (čas, pen, trest, výsledek, celkem, kolo)
+                    const dataColIndices = headers.reduce((acc, h, i) => {
+                        const l = h.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        if (l.includes('cas') || l.includes('pen') || l.includes('trest') || l.includes('vysledek') || l.includes('celkem') || l.includes('kolo')) {
+                            acc.push(i);
+                        }
+                        return acc;
+                    }, []);
+
+                    // Vyfiltrujeme kategorie POUZE z těch řádků, kde už je zapsaný nějaký výsledek (není to prázdné a není to pomlčka)
+                    const rawCategories = allData.filter(row => {
+                        return dataColIndices.some(i => {
+                            let val = row[i];
+                            return val !== undefined && val !== null && val.toString().trim() !== '' && val.toString().trim() !== '-';
+                        });
+                    }).map(row => row[categoryColumnIndex]).filter(c => c && c.trim() !== '');
+
                     const uniqueCats = [...new Set(rawCategories)];
                     
                     let newCategories = [...uniqueCats];
@@ -271,9 +287,13 @@
             const thead = document.getElementById('table-head');
             const tbody = document.getElementById('table-body');
             
-            let dataToShow = [...allData]; 
-            if (categoryColumnIndex !== -1 && categories.length > 0) {
-                if (currentCategory.startsWith('Vše ')) {
+          let dataToShow = [...allData]; 
+            if (categoryColumnIndex !== -1) {
+                if (categories.length === 0) {
+                    // Pokud zatím žádná kategorie nemá data, skryjeme všechny závodníky
+                    dataToShow = [];
+                } else if (currentCategory.startsWith('Vše ')) {
+                    
                     const searchType = currentCategory.replace('Vše ', '');
                     dataToShow = allData.filter(row => {
                         const cat = row[categoryColumnIndex];
