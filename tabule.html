@@ -81,10 +81,10 @@
         </div>
         
         <div class="flex flex-wrap justify-center items-center gap-3 md:gap-4">
-            <button id="autoplay-btn" onclick="toggleAutoPlay()" class="flex items-center gap-2 bg-emerald-600/20 text-emerald-400 border border-emerald-600 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold transition-colors">
-                <span id="autoplay-icon">▶</span>
-                <span id="autoplay-text">AUTO-TV: ZAPNUTO</span>
-            </button>
+            <button id="autoplay-btn" onclick="toggleAutoPlay()" class="flex items-center gap-2 bg-slate-700 text-slate-400 border border-slate-600 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold transition-colors hover:text-white">
+    <span id="autoplay-icon">⏸</span>
+    <span id="autoplay-text">AUTO-TV: VYPNUTO</span>
+</button>
             <button onclick="toggleFullScreen()" class="flex items-center gap-2 bg-slate-800 text-slate-300 border border-slate-600 px-3 py-1.5 rounded-full text-xs md:text-sm font-bold transition-colors hover:text-white hover:bg-slate-700">
                 <span>⛶</span>
                 <span>FULLSCREEN</span>
@@ -128,7 +128,7 @@
         let currentCategory = 'Vše';
         let categoryColumnIndex = -1;
         
-        let isAutoPlay = true;
+       let isAutoPlay = false;
         let autoPlayTimer = null;
 
         async function fetchResults() {
