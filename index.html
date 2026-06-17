@@ -311,8 +311,8 @@
                 penaltyDetails.push(penalties[i]);
             }
             
-            let msg = `St.č. ${bib}   (${penaltyDetails.join( ' , ' )})`;
-
+           let msg = `St.č. ${bib}   (  ${penaltyDetails.join('  ,  ')}  )`;
+            
             toastMsg.textContent = msg;
             
             toast.classList.remove('opacity-0', 'translate-y-[-100%]', 'pointer-events-none');
