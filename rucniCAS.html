@@ -65,38 +65,11 @@
   <button onclick="odeslatData()" id="submitBtn">Uložit čas</button>
   <div id="status"></div>
 
-  <!-- Skrytá sekce pro vložení adresy skriptu (zobrazí se po kliknutí na nenápadný nápis) -->
-  <div class="setup-section" id="setupSection" style="display:none;">
-    <label for="scriptUrl"https://script.google.com/macros/s/AKfycbwCYF9jZdr4KT2wT-tBnCYKz5X8v60NT7u2S6RVR8Pfn4JTKLam83fKwDdxJq8_mSA-eg/exec">
-    <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/AKfycbwCYF9jZdr4KT2wT-tBnCYKz5X8v60NT7u2S6RVR8Pfn4JTKLam83fKwDdxJq8_mSA-eg/exec">
-    <button onclick="ulozitUrl()" style="margin-top: 10px; background-color: #6c757d; padding: 10px; font-size: 16px;">Uložit odkaz</button>
-  </div>
-  
-  <p onclick="document.getElementById('setupSection').style.display='block'" style="text-align:center; color:#ccc; font-size:12px; cursor:pointer; margin-top:30px;">[ Nastavení připojení ]</p>
-
   <script>
-    // Načtení URL z paměti telefonu po startu
-    window.onload = function() {
-      var savedUrl = localStorage.getItem('scriptUrl');
-      if(savedUrl) {
-        document.getElementById('scriptUrl').value = savedUrl;
-      } else {
-        document.getElementById('setupSection').style.display = 'block';
-      }
-    };
+    // TADY VLOŽTE SVŮJ ODKAZ Z GOOGLE APPS SCRIPTU (ten, co končí na /exec)
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxaL83eTowEBvAjtikldBW2As1sKeNiMa4rjwIdCzRuWTdR0Oklr0UrHkBYiODHVF0Sw/exec";
 
-    function ulozitUrl() {
-      var url = document.getElementById('scriptUrl').value.trim();
-      if(url && url.endsWith('/exec')) {
-        localStorage.setItem('scriptUrl', url);
-        alert('Odkaz byl uložen!');
-        document.getElementById('setupSection').style.display = 'none';
-      } else {
-        alert('Neplatný odkaz. Ujistěte se, že končí na /exec');
-      }
-    }
-
-    // Maska pro doplňování znaků (Změněno: místo tečky dáváme českou ČÁRKU)
+    // Maska pro doplňování znaků (místo tečky dáváme českou ČÁRKU)
     document.getElementById('cas_stopek').addEventListener('input', function (e) {
       var x = e.target.value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,2})(\d{0,2})(\d{0,2})/);
       if (!x[2]) { e.target.value = x[1]; } 
@@ -109,13 +82,13 @@
       var stCislo = document.getElementById('st_cislo').value;
       var rawCas = document.getElementById('cas_stopek').value;
       var typMereni = document.querySelector('input[name="typ_mereni"]:checked').value;
-      var scriptUrl = localStorage.getItem('scriptUrl');
+      var scriptUrl = SCRIPT_URL;
       
       var statusDiv = document.getElementById('status');
       var btn = document.getElementById('submitBtn');
 
-      if(!scriptUrl) {
-        alert('Nejprve dole nastavte odkaz na Google Skript!');
+      if(scriptUrl === "https://script.google.com/macros/s/AKfycbzxaL83eTowEBvAjtikldBW2As1sKeNiMa4rjwIdCzRuWTdR0Oklr0UrHkBYiODHVF0Sw/exec") {
+        alert('Nezapomeňte v kódu upravit proměnnou SCRIPT_URL na váš skutečný odkaz!');
         return;
       }
       if(!stCislo || !rawCas) {
