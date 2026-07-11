@@ -1,37 +1,42 @@
 <!DOCTYPE html>
-<html>
+<html lang="cs">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ruční měření</title>
+  <title>Ruční Časomíra</title>
   <style>
     body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: 0 auto; background-color: #f9f9f9; }
-    h2 { text-align: center; color: #333; }
+    h2 { text-align: center; color: #333; margin-bottom: 25px; }
     .form-group { margin-bottom: 20px; }
-    label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
-    input { width: 100%; padding: 12px; font-size: 18px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
+    label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+    input { width: 100%; padding: 15px; font-size: 20px; box-sizing: border-box; border: 2px solid #ddd; border-radius: 8px; transition: border-color 0.2s; }
+    input:focus { border-color: #007bff; outline: none; }
     
-    /* Styl pro velká přepínací tlačítka Start/Cíl */
-    .type-selector { display: flex; gap: 10px; margin-bottom: 20px; }
+    .type-selector { display: flex; gap: 12px; margin-bottom: 25px; }
     .type-option { flex: 1; text-align: center; }
-    .type-option input { display: none; } /* Schováme původní puntík */
+    .type-option input { display: none; }
     .type-option label {
-      display: block; padding: 15px; background-color: #fff; border: 2px solid #ccc;
-      border-radius: 6px; cursor: pointer; font-size: 18px; font-weight: bold; transition: all 0.2s;
+      display: block; padding: 15px; background-color: #fff; border: 2px solid #ddd;
+      border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: bold; transition: all 0.2s;
     }
-    /* Barva pro aktivní START */
     #typ_start:checked + label { background-color: #007bff; color: white; border-color: #0056b3; }
-    /* Barva pro aktivní CÍL */
     #typ_cil:checked + label { background-color: #dc3545; color: white; border-color: #bd2130; }
 
-    button { width: 100%; padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 6px; border: none; background-color: #28a745; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    button:active { transform: scale(0.98); }
-    #status { margin-top: 15px; padding: 12px; text-align: center; font-weight: bold; border-radius: 6px; display: none; }
+    button { width: 100%; padding: 18px; font-size: 20px; font-weight: bold; cursor: pointer; border-radius: 8px; border: none; background-color: #28a745; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s; }
+    button:active { transform: scale(0.97); }
+    #status { margin-top: 20px; padding: 15px; text-align: center; font-weight: bold; border-radius: 8px; display: none; font-size: 16px; }
+    
+    .loading { background-color: #e9ecef; color: #495057; }
+    .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    
+    .setup-section { margin-top: 40px; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .setup-section input { font-size: 14px; padding: 10px; margin-top: 5px; }
   </style>
 </head>
 <body>
 
-  <h2>Ruční zápis času</h2>
+  <h2>Ruční Časomíra</h2>
   
   <div class="form-group">
     <label>Typ měření:</label>
@@ -49,19 +54,49 @@
 
   <div class="form-group">
     <label for="st_cislo">Startovní číslo:</label>
-    <input type="number" id="st_cislo" pattern="[0-9]*" inputmode="numeric" placeholder="Např. 42">
+    <input type="number" id="st_cislo" inputmode="numeric" placeholder="Např. 42">
   </div>
 
   <div class="form-group">
-    <label for="cas_stopek">Čas ze stopek (jen číslice):</label>
-    <input type="text" id="cas_stopek" pattern="[0-9]*" inputmode="numeric" placeholder="HHMMSSmm">
+    <label for="cas_stopek">Čas ze stopek:</label>
+    <input type="text" id="cas_stopek" inputmode="numeric" placeholder="HHMMSSmm">
   </div>
 
-  <button onclick="odeslatData()">Uložit a odeslat</button>
+  <button onclick="odeslatData()" id="submitBtn">Uložit čas</button>
   <div id="status"></div>
 
+  <!-- Skrytá sekce pro vložení adresy skriptu (zobrazí se po kliknutí na nenápadný nápis) -->
+  <div class="setup-section" id="setupSection" style="display:none;">
+    <label for="scriptUrl">Zde vložte ten dlouhý odkaz končící na /exec:</label>
+    <input type="text" id="scriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
+    <button onclick="ulozitUrl()" style="margin-top: 10px; background-color: #6c757d; padding: 10px; font-size: 16px;">Uložit odkaz</button>
+  </div>
+  
+  <p onclick="document.getElementById('setupSection').style.display='block'" style="text-align:center; color:#ccc; font-size:12px; cursor:pointer; margin-top:30px;">[ Nastavení připojení ]</p>
+
   <script>
-    // Automatická vstupní maska pro dvojtečky a tečku
+    // Načtení URL z paměti telefonu po startu
+    window.onload = function() {
+      var savedUrl = localStorage.getItem('scriptUrl');
+      if(savedUrl) {
+        document.getElementById('scriptUrl').value = savedUrl;
+      } else {
+        document.getElementById('setupSection').style.display = 'block';
+      }
+    };
+
+    function ulozitUrl() {
+      var url = document.getElementById('scriptUrl').value.trim();
+      if(url && url.endsWith('/exec')) {
+        localStorage.setItem('scriptUrl', url);
+        alert('Odkaz byl uložen!');
+        document.getElementById('setupSection').style.display = 'none';
+      } else {
+        alert('Neplatný odkaz. Ujistěte se, že končí na /exec');
+      }
+    }
+
+    // Maska pro doplňování znaků (Změněno: místo tečky dáváme českou ČÁRKU)
     document.getElementById('cas_stopek').addEventListener('input', function (e) {
       var x = e.target.value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,2})(\d{0,2})(\d{0,2})/);
       if (!x[2]) { e.target.value = x[1]; } 
@@ -72,40 +107,75 @@
 
     function odeslatData() {
       var stCislo = document.getElementById('st_cislo').value;
-      var casStopek = document.getElementById('cas_stopek').value;
-      var statusDiv = document.getElementById('status');
-      
-      // Zjištění, která možnost je vybraná (START nebo CÍL)
+      var rawCas = document.getElementById('cas_stopek').value;
       var typMereni = document.querySelector('input[name="typ_mereni"]:checked').value;
+      var scriptUrl = localStorage.getItem('scriptUrl');
+      
+      var statusDiv = document.getElementById('status');
+      var btn = document.getElementById('submitBtn');
 
-      if(!stCislo || !casStopek) {
-        alert('Vyplňte prosím startovní číslo i čas!');
+      if(!scriptUrl) {
+        alert('Nejprve dole nastavte odkaz na Google Skript!');
+        return;
+      }
+      if(!stCislo || !rawCas) {
+        alert('Vyplňte číslo i čas!');
         return;
       }
 
-      statusDiv.style.display = 'block';
-      statusDiv.style.backgroundColor = '#eee';
-      statusDiv.style.color = '#333';
-      statusDiv.innerText = 'Odesílám...';
+      // --- CHYTRÉ DOPLNĚNÍ ČASU A NUL ---
+      // Rozdělíme zadaný čas na části (podle dvojtečky nebo čárky/tečky)
+      var dily = rawCas.split(/[:.,]/);
+      var h = (dily[0] || "00").padStart(2, '0'); // Hodiny (doplní nulu zleva, 1 -> 01)
+      var m = (dily[1] || "00").padStart(2, '0'); // Minuty
+      var s = (dily[2] || "00").padStart(2, '0'); // Sekundy
+      var ms = (dily[3] || "00").padEnd(2, '0');  // Setiny (doplní nulu zprava, 5 -> 50)
 
-      // Volání Google skriptu na serveru s novým parametrem typMereni
-      google.script.run
-        .withSuccessHandler(function() {
-          statusDiv.style.backgroundColor = '#d4edda';
-          statusDiv.style.color = '#155724';
-          statusDiv.innerText = 'Uloženo jako ' + typMereni + '!';
-          
-          // Vyčištění polí a vrácení kurzoru
-          document.getElementById('st_cislo').value = '';
-          document.getElementById('cas_stopek').value = '';
-          document.getElementById('st_cislo').focus();
-        })
-        .withFailureHandler(function(err) {
-          statusDiv.style.backgroundColor = '#f8d7da';
-          statusDiv.style.color = '#721c24';
-          statusDiv.innerText = 'Chyba: ' + err;
-        })
-        .ulozRucniCas(stCislo, casStopek, typMereni); // Posíláme i informaci o Startu/Cíli
+      // Složení do plného formátu s ČÁRKOU
+      var casStopek = h + ':' + m + ':' + s + ',' + ms;
+
+      // Příprava dat
+      var payload = {
+        "st_cislo": stCislo,
+        "kanal": typMereni,
+        "cas_zaznamu": casStopek,
+        "raw_data": typMereni + " " + stCislo + " " + casStopek + " (Rucne)"
+      };
+
+      // Zobrazení stavu
+      btn.disabled = true;
+      statusDiv.style.display = 'block';
+      statusDiv.className = 'loading';
+      statusDiv.innerText = 'Odesílám do tabulky...';
+
+      // Samotné odeslání požadavku přes internet
+      fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors', // DŮLEŽITÉ: Umožňuje odeslání na Google bez blokace
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(response => {
+        // I když je response "opaque" kvůli no-cors, považujeme ho za úspěšný, pokud nedošlo k výjimce (např. bez internetu)
+        statusDiv.className = 'success';
+        statusDiv.innerText = 'Čas uložen (' + typMereni + ')!';
+        
+        // Vyčištění a příprava na další čas
+        document.getElementById('st_cislo').value = '';
+        document.getElementById('cas_stopek').value = '';
+        document.getElementById('st_cislo').focus();
+        
+        setTimeout(() => { 
+          statusDiv.style.display = 'none'; 
+          btn.disabled = false;
+        }, 2000);
+      })
+      .catch(error => {
+        statusDiv.className = 'error';
+        statusDiv.innerText = 'Chyba připojení. Zkontrolujte internet.';
+        btn.disabled = false;
+        console.error('Error:', error);
+      });
     }
   </script>
 </body>
