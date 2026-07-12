@@ -56,6 +56,10 @@
     .hist-cislo { width: 60px; color: #555; }
     /* Mírné zvětšení a ztučnění času v historii */
     .hist-cas { color: #000; text-align: right; font-size: 19px; font-weight: 900; }
+    
+    /* Offline Fronta */
+    #queue-status { background-color: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; border: 1px solid #ffeeba; text-align: center; font-weight: bold; margin-bottom: 20px; display: none; }
+    .queue-pending { display: block !important; }
   </style>
 </head>
 <body>
@@ -81,6 +85,7 @@
     </div>
   </div>
 
+  <div id="queue-status">⚠️ Offline režim. Čeká na odeslání: <span id="queue-count">0</span> záznamů</div>
   <div id="status"></div>
 
   <div class="form-group">
@@ -118,6 +123,62 @@
     // Proměnná pro odpočet schování hlášky
     var statusTimeout;
 
+    // --- OFFLINE FRONTA LOGIKA ---
+    var QUEUE_KEY = "casomira_queue";
+    var isSyncing = false;
+
+    function getQueue() {
+      try { return JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; } 
+      catch (e) { return []; }
+    }
+
+    function saveQueue(q) {
+      localStorage.setItem(QUEUE_KEY, JSON.stringify(q));
+      updateQueueUI();
+    }
+
+    function updateQueueUI() {
+      var q = getQueue();
+      var queueBox = document.getElementById('queue-status');
+      var queueCount = document.getElementById('queue-count');
+      if (q.length > 0) {
+        queueBox.className = 'queue-pending';
+        if (queueCount) queueCount.innerText = q.length;
+      } else {
+        queueBox.className = '';
+      }
+    }
+
+    function syncQueue() {
+      if (isSyncing || !navigator.onLine) return;
+      var q = getQueue();
+      if (q.length === 0) return;
+
+      isSyncing = true;
+      var item = q[0];
+
+      var queueBox = document.getElementById('queue-status');
+      queueBox.innerHTML = "🔄 Odesílám data z paměti... zbývá: " + q.length;
+
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item.payload)
+      })
+      .then(function() {
+        q.shift(); // Smaže úspěšně odeslaný
+        saveQueue(q);
+        isSyncing = false;
+        queueBox.innerHTML = '⚠️ Offline režim. Čeká na odeslání: <span id="queue-count">' + q.length + '</span> záznamů';
+        syncQueue(); // Zkusí hned další záznam
+      })
+      .catch(function(error) {
+        isSyncing = false;
+        queueBox.innerHTML = '⚠️ Offline režim. Čeká na odeslání: <span id="queue-count">' + q.length + '</span> záznamů';
+      });
+    }
+
     // --- LOGIKA BĚŽÍCÍHO DENNÍHO ČASU ---
     function ziskejAktualniCas() {
       var now = new Date();
@@ -130,6 +191,11 @@
 
     // Neustálá aktualizace displeje
     window.onload = function() {
+      updateQueueUI();
+      syncQueue(); // Zkusí odeslat stará data ihned při spuštění aplikace
+      window.addEventListener('online', syncQueue); // Zkusí odeslat, jakmile se mobil připojí k síti
+      setInterval(syncQueue, 10000); // Pro jistotu kontroluje paměť každých 10 sekund
+
       setInterval(function() {
         var displayEl = document.getElementById('display');
         if (displayEl) {
@@ -197,6 +263,30 @@
         "raw_data": typMereni + " " + stCislo + " " + formatovanyCas + " (" + zdrojZaznamu + ")"
       };
 
+      // Vždy zapíšeme okamžitě do vizuální historie (aby to rozhodčí hned viděl)
+      var historyList = document.getElementById('history-list');
+      var newItem = document.createElement('li');
+      var typeClass = typMereni === 'START' ? 'hist-start' : 'hist-cil';
+      newItem.innerHTML = '<span class="' + typeClass + '">' + typMereni + '</span> <span class="hist-cislo">#' + stCislo + '</span> <span class="hist-cas">' + formatovanyCas + '</span>';
+      historyList.insertBefore(newItem, historyList.firstChild);
+
+      // Okamžitě vyčistíme kolonku pro dalšího závodníka
+      document.getElementById('st_cislo').value = '';
+      document.getElementById('st_cislo').focus();
+
+      // Pokud mobil ví, že nemá internet, uložíme rovnou do paměti a ani nezkoušíme odeslat
+      if (!navigator.onLine) {
+         var q = getQueue();
+         q.push({ payload: payload });
+         saveQueue(q);
+         
+         statusDiv.style.display = 'block';
+         statusDiv.className = 'error';
+         statusDiv.innerText = "Jste offline! Čas uložen do paměti.";
+         statusTimeout = setTimeout(function() { statusDiv.style.display = 'none'; }, 2000);
+         return;
+      }
+
       btn.disabled = true;
       statusDiv.style.display = 'block';
       statusDiv.className = 'loading';
@@ -212,30 +302,26 @@
         statusDiv.className = 'success';
         statusDiv.innerText = "Odesláno!";
         
-        // Přidání do trvalé historie
-        var historyList = document.getElementById('history-list');
-        var newItem = document.createElement('li');
-        var typeClass = typMereni === 'START' ? 'hist-start' : 'hist-cil';
-        
-        newItem.innerHTML = '<span class="' + typeClass + '">' + typMereni + '</span> <span class="hist-cislo">#' + stCislo + '</span> <span class="hist-cas">' + formatovanyCas + '</span>';
-        historyList.insertBefore(newItem, historyList.firstChild);
-        
-        // Okamžitě vyčistí číslo pro dalšího závodníka
-        document.getElementById('st_cislo').value = '';
-        document.getElementById('st_cislo').focus();
-        
-        // Tlačítko odblokujeme OKAMŽITĚ, abychom mohli hned měřit dalšího
         btn.disabled = false;
         
-        // Hlášku o odesílání schováme rychle (2s), historie zůstává trvale
+        // Hlášku o odesílání schováme rychle (2s)
         statusTimeout = setTimeout(function() { 
           statusDiv.style.display = 'none'; 
         }, 2000);
       })
       .catch(function(error) {
+        // Pojistka: Pokud spojení spadne zrovna během letu požadavku
+        var q = getQueue();
+        q.push({ payload: payload });
+        saveQueue(q);
+
         statusDiv.className = 'error';
-        statusDiv.innerText = 'Chyba připojení. Zkontrolujte internet.';
+        statusDiv.innerText = 'Výpadek sítě. Čas uložen do paměti.';
         btn.disabled = false;
+        
+        statusTimeout = setTimeout(function() { 
+          statusDiv.style.display = 'none'; 
+        }, 3000);
       });
     }
 
