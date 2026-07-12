@@ -5,71 +5,207 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ruční Časomíra</title>
   <style>
-    body { font-family: sans-serif; padding: 20px; max-width: 400px; margin: 0 auto; background-color: #f9f9f9; }
-    h2 { text-align: center; color: #333; margin-bottom: 25px; }
+    body { font-family: sans-serif; padding: 15px; max-width: 450px; margin: 0 auto; background-color: #f9f9f9; }
+    h2 { text-align: center; color: #333; margin-bottom: 15px; font-size: 22px; }
+    
+    /* --- STOPKY CSS --- */
+    .stopwatch-card { background: #fff; padding: 20px; border-radius: 10px; border: 2px solid #ddd; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .stopwatch-display { font-size: 46px; font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #222; margin-bottom: 15px; font-variant-numeric: tabular-nums; }
+    .sw-controls { display: flex; gap: 10px; }
+    .sw-btn { flex: 1; padding: 15px; font-size: 18px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; color: white; transition: background 0.2s; }
+    .sw-start { background-color: #007bff; }
+    .sw-start.running { background-color: #ffc107; color: #333; }
+    .sw-reset { background-color: #6c757d; }
+    
+    /* --- FORMULÁŘ CSS --- */
     .form-group { margin-bottom: 20px; }
     label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
-    input { width: 100%; padding: 15px; font-size: 20px; box-sizing: border-box; border: 2px solid #ddd; border-radius: 8px; transition: border-color 0.2s; }
+    input[type="number"], input[type="text"] { width: 100%; padding: 15px; font-size: 24px; text-align: center; box-sizing: border-box; border: 2px solid #ddd; border-radius: 8px; transition: border-color 0.2s; }
     input:focus { border-color: #007bff; outline: none; }
     
-    .type-selector { display: flex; gap: 12px; margin-bottom: 25px; }
+    .type-selector { display: flex; gap: 12px; margin-bottom: 20px; }
     .type-option { flex: 1; text-align: center; }
     .type-option input { display: none; }
     .type-option label {
-      display: block; padding: 15px; background-color: #fff; border: 2px solid #ddd;
-      border-radius: 8px; cursor: pointer; font-size: 18px; font-weight: bold; transition: all 0.2s;
+      display: block; padding: 12px; background-color: #fff; border: 2px solid #ddd;
+      border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: bold; transition: all 0.2s;
     }
     #typ_start:checked + label { background-color: #007bff; color: white; border-color: #0056b3; }
     #typ_cil:checked + label { background-color: #dc3545; color: white; border-color: #bd2130; }
 
-    button { width: 100%; padding: 18px; font-size: 20px; font-weight: bold; cursor: pointer; border-radius: 8px; border: none; background-color: #28a745; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: transform 0.1s; }
-    button:active { transform: scale(0.97); }
-    #status { margin-top: 20px; padding: 15px; text-align: center; font-weight: bold; border-radius: 8px; display: none; font-size: 16px; }
+    /* Hlavní odesílací tlačítko stopek */
+    .btn-capture { width: 100%; padding: 22px; font-size: 22px; font-weight: bold; cursor: pointer; border-radius: 8px; border: none; background-color: #28a745; color: white; box-shadow: 0 4px 6px rgba(0,0,0,0.15); transition: transform 0.1s; margin-bottom: 20px; }
+    .btn-capture:active { transform: scale(0.96); background-color: #218838; }
     
+    #status { margin-bottom: 15px; padding: 15px; text-align: center; font-weight: bold; border-radius: 8px; display: none; font-size: 16px; }
     .loading { background-color: #e9ecef; color: #495057; }
     .success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
     .error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
-    
-    .setup-section { margin-top: 40px; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
-    .setup-section input { font-size: 14px; padding: 10px; margin-top: 5px; }
+
+    /* Manuální zadání (schované) */
+    details { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 20px; }
+    summary { font-weight: bold; color: #555; cursor: pointer; font-size: 16px; }
+    .manual-entry { margin-top: 15px; }
+    .btn-manual { width: 100%; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 8px; border: none; background-color: #17a2b8; color: white; margin-top: 10px; }
   </style>
 </head>
 <body>
 
   <h2>Ruční Časomíra</h2>
+
+  <!-- Integrované Stopky -->
+  <div class="stopwatch-card">
+    <div style="font-size: 14px; color: #777; margin-bottom: 5px; text-transform: uppercase;">Aktuální denní čas</div>
+    <div class="stopwatch-display" id="display">00:00:00,00</div>
+  </div>
   
   <div class="form-group">
-    <label>Typ měření:</label>
     <div class="type-selector">
       <div class="type-option">
-        <input type="radio" id="typ_start" name="typ_mereni" value="START" checked>
+        <input type="radio" id="typ_start" name="typ_mereni" value="START">
         <label for="typ_start">START</label>
       </div>
       <div class="type-option">
-        <input type="radio" id="typ_cil" name="typ_mereni" value="CÍL">
+        <input type="radio" id="typ_cil" name="typ_mereni" value="CÍL" checked>
         <label for="typ_cil">CÍL</label>
       </div>
     </div>
   </div>
+
+  <div id="status"></div>
 
   <div class="form-group">
     <label for="st_cislo">Startovní číslo:</label>
     <input type="number" id="st_cislo" inputmode="numeric" placeholder="Např. 42">
   </div>
 
-  <div class="form-group">
-    <label for="cas_stopek">Čas ze stopek:</label>
-    <input type="text" id="cas_stopek" inputmode="numeric" placeholder="HHMMSSmm">
-  </div>
+  <!-- Hlavní tlačítko, které bere čas ze stopek -->
+  <button class="btn-capture" id="submitBtn" onclick="odeslatAktualniCas()">⏱ ZAZNAMENAT ČAS</button>
 
-  <button onclick="odeslatData()" id="submitBtn">Uložit čas</button>
-  <div id="status"></div>
+  <!-- Původní ruční zadání ukryté v rozbalovacím menu -->
+  <details>
+    <summary>Zadat čas zpětně ručně (z papíru)</summary>
+    <div class="manual-entry">
+      <label for="cas_stopek">Čas (jen číslice):</label>
+      <input type="text" id="cas_stopek" inputmode="numeric" placeholder="HHMMSSmm">
+      <button class="btn-manual" onclick="odeslatRucniCas()">Uložit napsaný čas</button>
+    </div>
+  </details>
 
   <script>
-    // TADY VLOŽTE SVŮJ ODKAZ Z GOOGLE APPS SCRIPTU (ten, co končí na /exec)
+    // --- NASTAVENÍ ODKAZU ---
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxaL83eTowEBvAjtikldBW2As1sKeNiMa4rjwIdCzRuWTdR0Oklr0UrHkBYiODHVF0Sw/exec";
+    
+    // Proměnná pro odpočet schování hlášky
+    let statusTimeout;
 
-    // Maska pro doplňování znaků (místo tečky dáváme českou ČÁRKU)
+    // --- LOGIKA BĚŽÍCÍHO DENNÍHO ČASU ---
+    function ziskejAktualniCas() {
+      const now = new Date();
+      const h = now.getHours().toString().padStart(2, '0');
+      const m = now.getMinutes().toString().padStart(2, '0');
+      const s = now.getSeconds().toString().padStart(2, '0');
+      const ms = Math.floor(now.getMilliseconds() / 10).toString().padStart(2, '0');
+      return h + ':' + m + ':' + s + ',' + ms;
+    }
+
+    // Neustálá aktualizace displeje
+    setInterval(() => {
+      document.getElementById('display').innerText = ziskejAktualniCas();
+    }, 10);
+
+    // --- LOGIKA ODESÍLÁNÍ DAT ---
+
+    // 1. Odeslání aktuálního denního času
+    function odeslatAktualniCas() {
+      var stCislo = document.getElementById('st_cislo').value;
+      if(!stCislo) {
+        alert('Nejprve zadejte startovní číslo!');
+        document.getElementById('st_cislo').focus();
+        return;
+      }
+
+      // Získáme přesný denní čas v momentě kliknutí
+      var zachycenyCas = ziskejAktualniCas(); 
+      var typMereni = document.querySelector('input[name="typ_mereni"]:checked').value;
+      
+      // Odešleme na server
+      odeslatNaServer(stCislo, typMereni, zachycenyCas, "Denní čas z mobilu");
+    }
+
+    // 2. Odeslání z ručního textového pole (původní funkce)
+    function odeslatRucniCas() {
+      var stCislo = document.getElementById('st_cislo').value;
+      var rawCas = document.getElementById('cas_stopek').value;
+      var typMereni = document.querySelector('input[name="typ_mereni"]:checked').value;
+
+      if(!stCislo || !rawCas) {
+        alert('Vyplňte číslo i ruční čas!');
+        return;
+      }
+
+      var dily = rawCas.split(/[:.,]/);
+      var h = (dily[0] || "00").padStart(2, '0');
+      var m = (dily[1] || "00").padStart(2, '0');
+      var s = (dily[2] || "00").padStart(2, '0');
+      var ms = (dily[3] || "00").padEnd(2, '0');
+      var rucniCasZpracovany = h + ':' + m + ':' + s + ',' + ms;
+
+      odeslatNaServer(stCislo, typMereni, rucniCasZpracovany, "Ručně přepsáno");
+      document.getElementById('cas_stopek').value = ''; // Vyčištění
+    }
+
+    // --- JÁDRO PRO ODESLÁNÍ (Společné pro stopky i ruční zápis) ---
+    function odeslatNaServer(stCislo, typMereni, formatovanyCas, zdrojZaznamu) {
+      var statusDiv = document.getElementById('status');
+      var btn = document.getElementById('submitBtn');
+
+      // Vyrušíme předchozí odpočet, pokud měříme více dětí rychle za sebou
+      clearTimeout(statusTimeout);
+
+      var payload = {
+        "st_cislo": stCislo,
+        "kanal": typMereni,
+        "cas_zaznamu": formatovanyCas,
+        "raw_data": typMereni + " " + stCislo + " " + formatovanyCas + " (" + zdrojZaznamu + ")"
+      };
+
+      btn.disabled = true;
+      statusDiv.style.display = 'block';
+      statusDiv.className = 'loading';
+      statusDiv.innerText = `Odesílám čas ${formatovanyCas}...`;
+
+      fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(response => {
+        statusDiv.className = 'success';
+        // Zobrazíme ve zprávě číslo i přesný čas pro snadné opsání
+        statusDiv.innerText = `Uloženo! Číslo: ${stCislo} | Čas: ${formatovanyCas}`;
+        
+        // Okamžitě vyčistí číslo pro dalšího závodníka
+        document.getElementById('st_cislo').value = '';
+        document.getElementById('st_cislo').focus();
+        
+        // Tlačítko odblokujeme OKAMŽITĚ, abychom mohli hned měřit dalšího
+        btn.disabled = false;
+        
+        // Hlášku schováme až za 10 sekund (10 000 ms)
+        statusTimeout = setTimeout(() => { 
+          statusDiv.style.display = 'none'; 
+        }, 10000);
+      })
+      .catch(error => {
+        statusDiv.className = 'error';
+        statusDiv.innerText = 'Chyba připojení. Zkontrolujte internet.';
+        btn.disabled = false;
+      });
+    }
+
+    // Maska pro doplňování znaků v ručním poli
     document.getElementById('cas_stopek').addEventListener('input', function (e) {
       var x = e.target.value.replace(/\D/g, '').match(/(\d{0,2})(\d{0,2})(\d{0,2})(\d{0,2})/);
       if (!x[2]) { e.target.value = x[1]; } 
@@ -77,75 +213,6 @@
       else if (!x[4]) { e.target.value = x[1] + ':' + x[2] + ':' + x[3]; } 
       else { e.target.value = x[1] + ':' + x[2] + ':' + x[3] + ',' + x[4]; }
     });
-
-    function odeslatData() {
-      var stCislo = document.getElementById('st_cislo').value;
-      var rawCas = document.getElementById('cas_stopek').value;
-      var typMereni = document.querySelector('input[name="typ_mereni"]:checked').value;
-      var scriptUrl = SCRIPT_URL;
-      
-      var statusDiv = document.getElementById('status');
-      var btn = document.getElementById('submitBtn');
-
-      if(!stCislo || !rawCas) {
-        alert('Vyplňte číslo i čas!');
-        return;
-      }
-
-      // --- CHYTRÉ DOPLNĚNÍ ČASU A NUL ---
-      // Rozdělíme zadaný čas na části (podle dvojtečky nebo čárky/tečky)
-      var dily = rawCas.split(/[:.,]/);
-      var h = (dily[0] || "00").padStart(2, '0'); // Hodiny (doplní nulu zleva, 1 -> 01)
-      var m = (dily[1] || "00").padStart(2, '0'); // Minuty
-      var s = (dily[2] || "00").padStart(2, '0'); // Sekundy
-      var ms = (dily[3] || "00").padEnd(2, '0');  // Setiny (doplní nulu zprava, 5 -> 50)
-
-      // Složení do plného formátu s ČÁRKOU
-      var casStopek = h + ':' + m + ':' + s + ',' + ms;
-
-      // Příprava dat
-      var payload = {
-        "st_cislo": stCislo,
-        "kanal": typMereni,
-        "cas_zaznamu": casStopek,
-        "raw_data": typMereni + " " + stCislo + " " + casStopek + " (Rucne)"
-      };
-
-      // Zobrazení stavu
-      btn.disabled = true;
-      statusDiv.style.display = 'block';
-      statusDiv.className = 'loading';
-      statusDiv.innerText = 'Odesílám do tabulky...';
-
-      // Samotné odeslání požadavku přes internet
-      fetch(scriptUrl, {
-        method: 'POST',
-        mode: 'no-cors', // DŮLEŽITÉ: Umožňuje odeslání na Google bez blokace
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
-      .then(response => {
-        // I když je response "opaque" kvůli no-cors, považujeme ho za úspěšný, pokud nedošlo k výjimce (např. bez internetu)
-        statusDiv.className = 'success';
-        statusDiv.innerText = 'Čas uložen (' + typMereni + ')!';
-        
-        // Vyčištění a příprava na další čas
-        document.getElementById('st_cislo').value = '';
-        document.getElementById('cas_stopek').value = '';
-        document.getElementById('st_cislo').focus();
-        
-        setTimeout(() => { 
-          statusDiv.style.display = 'none'; 
-          btn.disabled = false;
-        }, 2000);
-      })
-      .catch(error => {
-        statusDiv.className = 'error';
-        statusDiv.innerText = 'Chyba připojení. Zkontrolujte internet.';
-        btn.disabled = false;
-        console.error('Error:', error);
-      });
-    }
   </script>
 </body>
 </html>
