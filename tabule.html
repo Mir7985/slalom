@@ -288,9 +288,9 @@
             
             let dataToShow = [...allData]; 
             if (categoryColumnIndex !== -1) {
-                if (categories.length === 0) {
-                    // Pokud zatím žádná kategorie nemá data, skryjeme všechny závodníky
-                    dataToShow = [];
+               if (categories.length === 0) {
+    dataToShow = [...allData];
+}
                 } else if (currentCategory.startsWith('Vše ')) {
                     
                     const searchType = currentCategory.replace('Vše ', '');
